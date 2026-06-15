@@ -16,7 +16,8 @@ interface Line {
 type Flow =
   | null
   | { cmd: "login"; step: "email" | "password" | "totp"; email?: string; password?: string }
-  | { cmd: "register"; step: "email" | "password"; email?: string };
+  | { cmd: "register"; step: "email" | "password"; email?: string }
+  | { cmd: "forgot"; step: "email" };
 
 const toneClass: Record<Tone, string> = {
   out: "text-fg",
@@ -29,7 +30,7 @@ const toneClass: Record<Tone, string> = {
 
 const BANNER: Line[] = [
   { text: "auth-console v1.0 — secure access", tone: "accent" },
-  { text: "commands: login · register · help · clear · exit", tone: "dim" },
+  { text: "commands: login · register · forgot · help · clear · exit", tone: "dim" },
 ];
 
 export default function TerminalConsole({ onClose }: { onClose: () => void }) {
@@ -82,6 +83,7 @@ export default function TerminalConsole({ onClose }: { onClose: () => void }) {
       case "help":
         push("login     — sign in");
         push("register  — create an account (email will be sent)");
+        push("forgot    — reset a forgotten password");
         push("clear     — clear the console");
         push("exit      — close the console (Esc)");
         break;
@@ -99,6 +101,10 @@ export default function TerminalConsole({ onClose }: { onClose: () => void }) {
         setFlow({ cmd: "register", step: "email" });
         push("register. enter email:", "dim");
         break;
+      case "forgot":
+        setFlow({ cmd: "forgot", step: "email" });
+        push("password reset. enter your account email:", "dim");
+        break;
       default:
         push(`command not found: ${input}. type help`, "err");
     }
@@ -106,6 +112,31 @@ export default function TerminalConsole({ onClose }: { onClose: () => void }) {
 
   async function advanceFlow(input: string) {
     if (!flow) return;
+
+    // ── СБРОС ПАРОЛЯ ─────────────────────────────────────────────
+    if (flow.cmd === "forgot") {
+      setBusy(true);
+      try {
+        const res = await fetch("/api/forgot-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: input }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          push(data.message ?? "if the account exists, a reset link was sent.", "ok");
+          push("open the link from the email to set a new password", "dim");
+        } else {
+          push(data.error ?? "error", "err");
+        }
+      } catch {
+        push("network unavailable, try again later", "err");
+      } finally {
+        setBusy(false);
+        setFlow(null);
+      }
+      return;
+    }
 
     // ── РЕГИСТРАЦИЯ ──────────────────────────────────────────────
     if (flow.cmd === "register") {
