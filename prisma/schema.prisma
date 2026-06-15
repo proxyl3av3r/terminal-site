@@ -23,6 +23,10 @@ model User {
   username      String?   @unique
   // Короткий публичный 6-значный ID для приглашений (уникальный).
   shortId       String?   @unique
+  // Конфиг аватара (JSON: bg/color/eyes/mouth). null = дефолт от id.
+  avatar        String?
+  // Игровые очки — за них открывается кастомизация (Фаза 5).
+  points        Int       @default(0)
   // Хеш пароля (argon2). null допустим теоретически (напр. OAuth), но у нас
   // всегда заполнен при регистрации через credentials.
   passwordHash  String?

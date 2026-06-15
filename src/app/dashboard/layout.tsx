@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import Sidebar from "@/components/dashboard/Sidebar";
+import { parseAvatar } from "@/lib/avatar";
 
 // Защищённый layout. middleware уже не пускает анонимов, но дублируем проверку
 // на сервере (defense in depth) и берём профиль для сайдбара.
@@ -16,8 +17,9 @@ export default async function DashboardLayout({
 
   const user = await db.user.findUnique({
     where: { id: session.user.id },
-    select: { email: true, username: true, shortId: true },
+    select: { email: true, username: true, shortId: true, avatar: true },
   });
+  const avatarConfig = parseAvatar(user?.avatar ?? null, session.user.id);
 
   return (
     <div className="flex min-h-screen">
@@ -25,6 +27,7 @@ export default async function DashboardLayout({
         email={user?.email ?? ""}
         username={user?.username ?? null}
         shortId={user?.shortId ?? null}
+        avatar={avatarConfig}
       />
       <div className="flex-1 overflow-x-hidden p-8">
         {!user?.username && (
