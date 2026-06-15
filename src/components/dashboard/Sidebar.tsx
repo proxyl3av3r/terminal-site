@@ -9,6 +9,7 @@ import type { AvatarConfig } from "@/lib/avatar";
 // Терминальный сайдбар. Активный пункт подсвечен «> », как курсор в меню.
 const NAV = [
   { href: "/dashboard", label: "overview", cmd: "~/" },
+  { href: "/dashboard/chat", label: "chat", cmd: "~/chat" },
   { href: "/dashboard/avatar", label: "avatar", cmd: "~/avatar" },
   { href: "/dashboard/ascii", label: "img2ascii", cmd: "~/ascii" },
   { href: "/dashboard/settings", label: "settings", cmd: "~/settings" },
