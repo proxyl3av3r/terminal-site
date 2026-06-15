@@ -7,25 +7,25 @@ import { useEffect, useRef, useState } from "react";
 // ─────────────────────────────────────────────────────────────────────
 const CONTENT = {
   about: [
-    "I'm a developer who likes clean systems and command lines.",
-    "This site is a personal terminal — quiet, fast, mine.",
-    "type `projects`, `skills` or `contact` to learn more.",
+    "someone who builds things and prefers the command line.",
+    "this is a personal terminal — quiet, fast, intentionally sparse.",
+    "type `skills` to see what I work with.",
   ],
   projects: [
-    "terminal-site   — this very site (Next.js, Prisma, 2FA)",
-    "…               — your next project goes here",
+    "terminal-site   — this very place (Next.js · Prisma · 2FA)",
+    "…               — more, eventually.",
   ],
   skills: [
-    "languages   typescript · python · sql",
-    "web         next.js · react · node · tailwind",
-    "infra       docker · postgres · nginx · linux",
+    "web      next.js · react · node · tailwind",
+    "infra    docker · postgres · nginx · linux",
   ],
+  // Приватность: личный email тут не показываем. Хочешь связь — заведи
+  // отдельный публичный адрес (напр. hi@klebold.xyz) и впиши сюда.
   contact: [
-    { text: "email     rishelie2003@gmail.com", href: "mailto:rishelie2003@gmail.com" },
+    { text: "no public inbox yet. find me through `social`." },
   ],
   social: [
     { text: "github    github.com/proxyl3av3r", href: "https://github.com/proxyl3av3r" },
-    // add more: { text: "x         x.com/you", href: "https://x.com/you" },
   ],
 };
 
