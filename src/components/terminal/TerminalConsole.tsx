@@ -33,7 +33,13 @@ const BANNER: Line[] = [
   { text: "commands: login · register · forgot · help · clear · exit", tone: "dim" },
 ];
 
-export default function TerminalConsole({ onClose }: { onClose: () => void }) {
+export default function TerminalConsole({
+  onClose,
+  initialCommand,
+}: {
+  onClose: () => void;
+  initialCommand?: "login" | "register" | "forgot";
+}) {
   const [lines, setLines] = useState<Line[]>(BANNER);
   const [flow, setFlow] = useState<Flow>(null);
   const [value, setValue] = useState("");
@@ -58,6 +64,16 @@ export default function TerminalConsole({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     inputRef.current?.focus();
   }, [busy, flow]);
+
+  // Авто-запуск команды, если консоль открыта из публичного CLI (login/register…).
+  const ranInitial = useRef(false);
+  useEffect(() => {
+    if (initialCommand && !ranInitial.current) {
+      ranInitial.current = true;
+      submit(initialCommand);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [lines]);

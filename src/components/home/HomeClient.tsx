@@ -1,41 +1,77 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import MatrixRain from "@/components/canvas/MatrixRain";
 import HeroTypewriter from "@/components/home/HeroTypewriter";
 import SecretTrigger from "@/components/home/SecretTrigger";
+import PublicCLI from "@/components/home/PublicCLI";
+import BootSequence from "@/components/home/BootSequence";
 import TerminalConsole from "@/components/terminal/TerminalConsole";
 
 // Status text after email verification (?verified=... from the API).
 const VERIFY_MSG: Record<string, { text: string; tone: string }> = {
-  success: { text: "email verified. you can sign in now: access _", tone: "text-accent" },
+  success: { text: "email verified. you can sign in now: type login", tone: "text-accent" },
   expired: { text: "link expired. please register again.", tone: "text-danger" },
   invalid: { text: "invalid link.", tone: "text-danger" },
   ratelimited: { text: "too many attempts, please wait.", tone: "text-danger" },
 };
 
-export default function HomeClient({ verified }: { verified?: string }) {
-  const [open, setOpen] = useState(false);
-  const status = verified ? VERIFY_MSG[verified] : undefined;
+type AuthCmd = "login" | "register" | "forgot";
 
-  // Hidden hotkey: Ctrl/Cmd + ` also opens the console.
+export default function HomeClient({ verified }: { verified?: string }) {
+  const [booting, setBooting] = useState(true);
+  const [authCmd, setAuthCmd] = useState<AuthCmd | null>(null);
+  const status = verified ? VERIFY_MSG[verified] : undefined;
+  const heroRef = useRef<HTMLDivElement>(null);
+
+  // Boot-анимация только при первом визите.
+  useEffect(() => {
+    if (localStorage.getItem("booted") === "1") setBooting(false);
+  }, []);
+
+  // Hidden hotkey: Ctrl/Cmd + ` opens the secure console.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "`" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        setOpen(true);
+        setAuthCmd("login");
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Лёгкий параллакс-наклон контента за курсором (отключён при reduced-motion).
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const el = heroRef.current;
+    if (!el) return;
+    const onMove = (e: MouseEvent) => {
+      const rx = (e.clientY / window.innerHeight - 0.5) * -3;
+      const ry = (e.clientX / window.innerWidth - 0.5) * 3;
+      el.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg)`;
+    };
+    window.addEventListener("mousemove", onMove);
+    return () => window.removeEventListener("mousemove", onMove);
+  }, [booting]);
+
+  if (booting) {
+    return (
+      <BootSequence
+        onDone={() => {
+          localStorage.setItem("booted", "1");
+          setBooting(false);
+        }}
+      />
+    );
+  }
+
   return (
     <>
       <MatrixRain />
 
-      <main className="relative z-10 flex min-h-screen flex-col justify-center px-6 sm:px-12 lg:px-24">
-        <div className="max-w-2xl">
+      <main className="relative z-10 flex min-h-screen flex-col justify-center px-6 py-16 sm:px-12 lg:px-24">
+        <div ref={heroRef} className="max-w-2xl transition-transform duration-200 ease-out">
           <p className="mb-4 text-xs uppercase tracking-[0.3em] text-fg-dim">
             klebold.xyz
           </p>
@@ -49,20 +85,22 @@ export default function HomeClient({ verified }: { verified?: string }) {
             ]}
           />
 
-          <p className="mt-8 max-w-md text-sm leading-relaxed text-fg-dim">
-            A personal space in command-line aesthetics. Quiet, clean, to the
-            point. The entrance is hidden somewhere here.
-          </p>
-
           {status && (
             <p className={`mt-6 text-sm ${status.tone}`}>{status.text}</p>
           )}
+
+          <PublicCLI onAuth={(cmd) => setAuthCmd(cmd)} />
         </div>
       </main>
 
-      <SecretTrigger onOpen={() => setOpen(true)} />
+      <SecretTrigger onOpen={() => setAuthCmd("login")} />
 
-      {open && <TerminalConsole onClose={() => setOpen(false)} />}
+      {authCmd && (
+        <TerminalConsole
+          initialCommand={authCmd}
+          onClose={() => setAuthCmd(null)}
+        />
+      )}
     </>
   );
 }

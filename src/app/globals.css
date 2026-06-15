@@ -4,6 +4,18 @@
 
 :root {
   color-scheme: dark;
+  /* Акцентный цвет — RGB-каналы, чтобы работали tailwind-модификаторы прозрачности
+     (text-accent/40 и т.п.). Тема меняет именно эту переменную. */
+  --accent: 57 255 20; /* neon green */
+}
+html[data-theme="amber"] {
+  --accent: 255 176 0;
+}
+html[data-theme="mono"] {
+  --accent: 200 200 200;
+}
+html[data-theme="ice"] {
+  --accent: 90 200 255;
 }
 
 html {

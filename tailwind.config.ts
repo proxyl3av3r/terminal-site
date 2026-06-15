@@ -10,8 +10,8 @@ const config: Config = {
         "bg-soft": "#101010",
         fg: "#c8c8c8",
         "fg-dim": "#6a6a6a",
-        accent: "#39ff14", // неоново-зелёный
-        "accent-amber": "#ffb000", // янтарный
+        accent: "rgb(var(--accent) / <alpha-value>)", // тема-зависимый акцент
+        "accent-amber": "#ffb000", // янтарный (статичный)
         danger: "#ff3b30",
       },
       fontFamily: {

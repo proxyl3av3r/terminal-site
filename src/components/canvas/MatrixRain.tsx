@@ -33,6 +33,24 @@ export default function MatrixRain() {
     let columns: Column[] = [];
     let raf = 0;
 
+    // Цвет потока берём из CSS-переменной темы (--accent), пересчитываем при смене.
+    let accent = "57,255,20";
+    const readAccent = () => {
+      const v = getComputedStyle(document.documentElement)
+        .getPropertyValue("--accent")
+        .trim();
+      if (v) accent = v.replace(/\s+/g, ",");
+    };
+    readAccent();
+
+    // Режим "matrix": временно ярче и плотнее (команда из CLI).
+    let boostUntil = 0;
+    const onBoost = () => {
+      boostUntil = Date.now() + 6000;
+    };
+    window.addEventListener("matrix-boost", onBoost);
+    window.addEventListener("theme-change", readAccent);
+
     const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 
     function build() {
@@ -65,8 +83,10 @@ export default function MatrixRain() {
       const w = window.innerWidth;
       const h = window.innerHeight;
 
-      // Полупрозрачная заливка создаёт «шлейф» затухания.
-      ctx!.fillStyle = "rgba(10,10,10,0.22)";
+      const boosted = Date.now() < boostUntil;
+
+      // Полупрозрачная заливка создаёт «шлейф» затухания (в boost — длиннее шлейф).
+      ctx!.fillStyle = boosted ? "rgba(10,10,10,0.10)" : "rgba(10,10,10,0.22)";
       ctx!.fillRect(0, 0, w, h);
 
       const mx = mouse.current.x;
@@ -94,15 +114,16 @@ export default function MatrixRain() {
           const near = dist2 < 14000;
 
           let alpha = (1 - k / col.len) * (0.35 + depth * 0.5);
+          if (boosted) alpha = Math.min(1, alpha + 0.35);
           if (k === 0) {
             // голова потока — самая яркая
-            ctx!.fillStyle = near ? "#ffd24d" : "#d8ffd0";
-            alpha = 0.9;
+            ctx!.fillStyle = near ? "#ffd24d" : "#e8ffe0";
+            alpha = 0.95;
           } else if (near) {
             ctx!.fillStyle = "#ffb000";
             alpha = Math.min(1, alpha + 0.4);
           } else {
-            ctx!.fillStyle = "#39ff14";
+            ctx!.fillStyle = `rgb(${accent})`;
           }
           ctx!.globalAlpha = alpha;
 
@@ -146,6 +167,8 @@ export default function MatrixRain() {
       window.removeEventListener("resize", onResize);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseout", onLeave);
+      window.removeEventListener("matrix-boost", onBoost);
+      window.removeEventListener("theme-change", readAccent);
     };
   }, []);
 
