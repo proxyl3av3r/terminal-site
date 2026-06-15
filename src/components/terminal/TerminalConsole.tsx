@@ -146,13 +146,9 @@ export default function TerminalConsole({ onClose }: { onClose: () => void }) {
         return;
       }
       if (flow.step === "password") {
+        // attemptLogin сам решит: успех → редирект, 2FA → переведёт flow в
+        // step "totp" (сохранив email+password), ошибка → сбросит flow.
         await attemptLogin(flow.email!, input, undefined);
-        // если потребуется 2FA — attemptLogin переведёт flow в step totp
-        setFlow((f) =>
-          f && f.cmd === "login"
-            ? { ...f, step: "password", password: input }
-            : f,
-        );
         return;
       }
       if (flow.step === "totp") {
