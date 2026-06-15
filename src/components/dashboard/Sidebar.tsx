@@ -7,6 +7,7 @@ import { signOut } from "next-auth/react";
 // Терминальный сайдбар. Активный пункт подсвечен «> », как курсор в меню.
 const NAV = [
   { href: "/dashboard", label: "overview", cmd: "~/" },
+  { href: "/dashboard/ascii", label: "img2ascii", cmd: "~/ascii" },
   { href: "/dashboard/settings", label: "settings", cmd: "~/settings" },
 ];
 
