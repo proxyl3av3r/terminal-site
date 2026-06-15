@@ -20,3 +20,6 @@
 *.pem
 npm-debug.log*
 next-env.d.ts
+
+# TS build cache
+tsconfig.tsbuildinfo

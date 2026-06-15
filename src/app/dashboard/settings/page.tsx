@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import TwoFactorSetup from "@/components/dashboard/TwoFactorSetup";
+import ProfileSettings from "@/components/dashboard/ProfileSettings";
 
 // Серверный компонент: берём актуальный статус 2FA и отдаём клиентскому UI.
 export default async function SettingsPage() {
@@ -10,7 +11,7 @@ export default async function SettingsPage() {
 
   const user = await db.user.findUnique({
     where: { id: session.user.id },
-    select: { twoFactorEnabled: true },
+    select: { twoFactorEnabled: true, username: true, shortId: true },
   });
 
   return (
@@ -21,6 +22,11 @@ export default async function SettingsPage() {
         </h1>
         <p className="mt-1 text-sm text-fg-dim">account security</p>
       </header>
+
+      <ProfileSettings
+        initialUsername={user?.username ?? null}
+        initialShortId={user?.shortId ?? null}
+      />
 
       <TwoFactorSetup initialEnabled={user?.twoFactorEnabled ?? false} />
     </div>

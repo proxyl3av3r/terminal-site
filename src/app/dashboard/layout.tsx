@@ -1,21 +1,42 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
 import Sidebar from "@/components/dashboard/Sidebar";
 
 // Защищённый layout. middleware уже не пускает анонимов, но дублируем проверку
-// на сервере (defense in depth) и берём email для сайдбара.
+// на сервере (defense in depth) и берём профиль для сайдбара.
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const session = await auth();
-  if (!session?.user) redirect("/");
+  if (!session?.user?.id) redirect("/");
+
+  const user = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: { email: true, username: true, shortId: true },
+  });
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar email={session.user.email ?? ""} />
-      <div className="flex-1 overflow-x-hidden p-8">{children}</div>
+      <Sidebar
+        email={user?.email ?? ""}
+        username={user?.username ?? null}
+        shortId={user?.shortId ?? null}
+      />
+      <div className="flex-1 overflow-x-hidden p-8">
+        {!user?.username && (
+          <div className="mb-6 rounded-lg border border-accent-amber/40 bg-accent-amber/10 px-4 py-3 text-sm text-accent-amber">
+            pick a username to unlock invites & chat →{" "}
+            <Link href="/dashboard/settings" className="underline">
+              settings
+            </Link>
+          </div>
+        )}
+        {children}
+      </div>
     </div>
   );
 }
