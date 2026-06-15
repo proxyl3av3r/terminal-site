@@ -1,28 +1,37 @@
 import nodemailer from "nodemailer";
 
-// Транспорт Gmail SMTP. Требует App Password (не обычный пароль аккаунта).
+// Универсальный SMTP-транспорт. Подходит для любого провайдера:
+// Resend (smtp.resend.com), почта домена, Brevo, Mailgun и т.д.
 // Создаётся лениво, чтобы отсутствие переменных не роняло сборку.
 let transporter: nodemailer.Transporter | null = null;
 
 function getTransporter(): nodemailer.Transporter {
   if (transporter) return transporter;
 
-  const user = process.env.GMAIL_USER;
-  const pass = process.env.GMAIL_APP_PASSWORD;
-  if (!user || !pass) {
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT ?? 465);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!host || !user || !pass) {
     throw new Error(
-      "GMAIL_USER / GMAIL_APP_PASSWORD не заданы в .env — почта не настроена",
+      "SMTP_HOST / SMTP_USER / SMTP_PASS не заданы в .env — почта не настроена",
     );
   }
 
   transporter = nodemailer.createTransport({
-    service: "gmail",
+    host,
+    port,
+    secure: port === 465, // 465 = implicit TLS, 587 = STARTTLS
     auth: { user, pass },
   });
   return transporter;
 }
 
 const SITE = () => process.env.SITE_NAME ?? "terminal-site";
+
+// Адрес отправителя. Для Resend — verified-домен, напр. noreply@klebold.xyz.
+const FROM = () =>
+  process.env.EMAIL_FROM ?? `${SITE()} <${process.env.SMTP_USER}>`;
 
 /** Письмо со ссылкой подтверждения регистрации. */
 export async function sendVerificationEmail(
@@ -31,7 +40,7 @@ export async function sendVerificationEmail(
 ): Promise<void> {
   const site = SITE();
   await getTransporter().sendMail({
-    from: `${site} <${process.env.GMAIL_USER}>`,
+    from: FROM(),
     to,
     subject: `[${site}] подтверждение регистрации`,
     text: `Подтвердите email, перейдя по ссылке (действует 24ч):\n${verifyUrl}\n\nЕсли это были не вы — просто игнорируйте письмо.`,
