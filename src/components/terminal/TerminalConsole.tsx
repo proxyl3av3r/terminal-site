@@ -33,6 +33,23 @@ const BANNER: Line[] = [
   { text: "commands: login · register · forgot · help · clear · exit", tone: "dim" },
 ];
 
+// Стартовое состояние при открытии консоли с предзаданной командой.
+function initialState(cmd?: "login" | "register" | "forgot"): {
+  lines: Line[];
+  flow: Flow;
+} {
+  if (!cmd) return { lines: BANNER, flow: null };
+  const prompts: Record<string, string> = {
+    login: "sign in. enter email:",
+    register: "register. enter email:",
+    forgot: "password reset. enter your account email:",
+  };
+  return {
+    lines: [...BANNER, { text: `$ ${cmd}`, tone: "in" }, { text: prompts[cmd], tone: "dim" }],
+    flow: { cmd, step: "email" } as Flow,
+  };
+}
+
 export default function TerminalConsole({
   onClose,
   initialCommand,
@@ -40,8 +57,11 @@ export default function TerminalConsole({
   onClose: () => void;
   initialCommand?: "login" | "register" | "forgot";
 }) {
-  const [lines, setLines] = useState<Line[]>(BANNER);
-  const [flow, setFlow] = useState<Flow>(null);
+  // Детерминированная стартовая инициализация по initialCommand — без эффекта
+  // и без авто-submit (раньше двойной прогон проскакивал пустой email в пароль).
+  const initial = useRef(initialState(initialCommand)).current;
+  const [lines, setLines] = useState<Line[]>(initial.lines);
+  const [flow, setFlow] = useState<Flow>(initial.flow);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -65,15 +85,6 @@ export default function TerminalConsole({
     inputRef.current?.focus();
   }, [busy, flow]);
 
-  // Авто-запуск команды, если консоль открыта из публичного CLI (login/register…).
-  const ranInitial = useRef(false);
-  useEffect(() => {
-    if (initialCommand && !ranInitial.current) {
-      ranInitial.current = true;
-      submit(initialCommand);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [lines]);

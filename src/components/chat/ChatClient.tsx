@@ -26,6 +26,8 @@ interface Message {
 }
 
 const seedOf = (u: PublicUser) => u.shortId ?? u.username ?? "anon";
+const fmtTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const titleOf = (c: Conversation) =>
   c.isGroup
     ? c.name ?? "group"
@@ -150,26 +152,42 @@ export default function ChatClient({
               )}
             </div>
 
-            <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
-              {messages.map((m) => {
+            <div className="flex-1 space-y-1 overflow-y-auto px-4 py-3">
+              {messages.map((m, i) => {
                 const mine = m.senderId === meId;
+                // Начало «группы» — когда отправитель сменился (или прошло >5 мин).
+                const prev = messages[i - 1];
+                const groupStart =
+                  !prev ||
+                  prev.senderId !== m.senderId ||
+                  +new Date(m.createdAt) - +new Date(prev.createdAt) > 5 * 60_000;
+
                 return (
-                  <div key={m.id} className={`flex gap-2 ${mine ? "flex-row-reverse" : ""}`}>
-                    {!mine && (
-                      <Avatar config={parseAvatar(m.sender.avatar, seedOf(m.sender))} size={28} />
-                    )}
-                    <div className={`max-w-[75%] ${mine ? "items-end text-right" : ""}`}>
-                      {!mine && (
-                        <div className="mb-0.5 font-mono text-[11px] text-fg-dim">
-                          @{m.sender.username ?? "user"}
+                  <div
+                    key={m.id}
+                    className={`flex gap-2 ${mine ? "flex-row-reverse" : ""} ${groupStart ? "mt-3" : ""}`}
+                  >
+                    {/* колонка аватара: показываем только в начале группы */}
+                    <div className="w-7 shrink-0">
+                      {groupStart && (
+                        <Avatar config={parseAvatar(m.sender.avatar, seedOf(m.sender))} size={28} />
+                      )}
+                    </div>
+                    <div className={`min-w-0 max-w-[75%] ${mine ? "text-right" : ""}`}>
+                      {groupStart && (
+                        <div className="mb-0.5 flex items-center gap-2 font-mono text-[11px] text-fg-dim">
+                          <span className={mine ? "text-accent" : "text-fg"}>
+                            @{mine ? "you" : m.sender.username ?? "user"}
+                          </span>
+                          <span>{fmtTime(m.createdAt)}</span>
                         </div>
                       )}
                       {m.kind === "ascii" ? (
-                        <pre className="overflow-x-auto rounded bg-black/40 p-2 font-mono text-accent" style={{ fontSize: "5px", lineHeight: "5px" }}>
+                        <pre className="inline-block overflow-x-auto rounded bg-black/40 p-2 text-left font-mono text-accent" style={{ fontSize: "5px", lineHeight: "5px" }}>
                           {m.body}
                         </pre>
                       ) : (
-                        <div className={`inline-block rounded-lg px-3 py-1.5 text-sm ${mine ? "bg-accent/15 text-fg" : "bg-white/5 text-fg"}`}>
+                        <div className={`inline-block whitespace-pre-wrap break-words rounded-lg px-3 py-1.5 text-left text-sm ${mine ? "bg-accent/15 text-fg" : "bg-white/5 text-fg"}`}>
                           {m.body}
                         </div>
                       )}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -27,6 +28,27 @@ export default function Sidebar({
   avatar: AvatarConfig;
 }) {
   const pathname = usePathname();
+  const [unread, setUnread] = useState(0);
+
+  // Опрос непрочитанных для бейджа на пункте chat.
+  useEffect(() => {
+    let alive = true;
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/chat/unread");
+        const data = await res.json();
+        if (alive && data.ok) setUnread(data.count);
+      } catch {
+        /* ignore */
+      }
+    };
+    poll();
+    const i = setInterval(poll, 10000);
+    return () => {
+      alive = false;
+      clearInterval(i);
+    };
+  }, [pathname]);
 
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-white/10 bg-bg-soft/60 p-4">
@@ -49,7 +71,7 @@ export default function Sidebar({
             <Link
               key={item.href}
               href={item.href}
-              className={`rounded px-2 py-1.5 font-mono transition-colors ${
+              className={`flex items-center rounded px-2 py-1.5 font-mono transition-colors ${
                 active
                   ? "bg-accent/10 text-accent"
                   : "text-fg-dim hover:bg-white/5 hover:text-fg"
@@ -57,6 +79,11 @@ export default function Sidebar({
             >
               <span className="mr-1 text-accent">{active ? ">" : " "}</span>
               {item.label}
+              {item.href === "/dashboard/chat" && unread > 0 && (
+                <span className="ml-auto rounded-full bg-accent px-1.5 text-[10px] font-bold text-bg">
+                  {unread}
+                </span>
+              )}
             </Link>
           );
         })}
