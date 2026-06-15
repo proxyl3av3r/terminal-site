@@ -1,10 +1,10 @@
 // Главный экран панели — пока пустой каркас с местами под будущие модули.
 export default function DashboardPage() {
   const modules = [
-    { name: "notes", desc: "заметки / журнал", soon: true },
-    { name: "links", desc: "приватные ссылки", soon: true },
-    { name: "metrics", desc: "статистика сайта", soon: true },
-    { name: "files", desc: "хранилище", soon: true },
+    { name: "notes", desc: "notes / journal", soon: true },
+    { name: "links", desc: "private links", soon: true },
+    { name: "metrics", desc: "site analytics", soon: true },
+    { name: "files", desc: "storage", soon: true },
   ];
 
   return (
@@ -14,7 +14,7 @@ export default function DashboardPage() {
           <span className="text-accent">$</span> dashboard
         </h1>
         <p className="mt-1 text-sm text-fg-dim">
-          добро пожаловать. модули появятся здесь по мере готовности.
+          welcome. modules will appear here as they ship.
         </p>
       </header>
 

@@ -19,7 +19,7 @@ export default async function SettingsPage() {
         <h1 className="font-mono text-xl text-fg">
           <span className="text-accent">$</span> settings
         </h1>
-        <p className="mt-1 text-sm text-fg-dim">безопасность аккаунта</p>
+        <p className="mt-1 text-sm text-fg-dim">account security</p>
       </header>
 
       <TwoFactorSetup initialEnabled={user?.twoFactorEnabled ?? false} />

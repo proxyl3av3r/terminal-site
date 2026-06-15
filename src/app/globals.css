@@ -6,9 +6,12 @@
   color-scheme: dark;
 }
 
-html,
-body {
+html {
   background: #0a0a0a;
+}
+body {
+  /* прозрачный фон, чтобы canvas-фон (fixed, z-0) был виден сквозь body */
+  background: transparent;
   color: #c8c8c8;
   font-family: var(--font-mono), "JetBrains Mono", ui-monospace, monospace;
   -webkit-font-smoothing: antialiased;

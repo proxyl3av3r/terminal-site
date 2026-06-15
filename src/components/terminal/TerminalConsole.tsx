@@ -28,8 +28,8 @@ const toneClass: Record<Tone, string> = {
 };
 
 const BANNER: Line[] = [
-  { text: "auth-console v1.0 — защищённый вход", tone: "accent" },
-  { text: "команды: login · register · help · clear · exit", tone: "dim" },
+  { text: "auth-console v1.0 — secure access", tone: "accent" },
+  { text: "commands: login · register · help · clear · exit", tone: "dim" },
 ];
 
 export default function TerminalConsole({ onClose }: { onClose: () => void }) {
@@ -80,10 +80,10 @@ export default function TerminalConsole({ onClose }: { onClose: () => void }) {
     // Команды верхнего уровня
     switch (input.toLowerCase()) {
       case "help":
-        push("login     — войти в систему");
-        push("register  — создать аккаунт (придёт письмо)");
-        push("clear     — очистить консоль");
-        push("exit      — закрыть консоль (Esc)");
+        push("login     — sign in");
+        push("register  — create an account (email will be sent)");
+        push("clear     — clear the console");
+        push("exit      — close the console (Esc)");
         break;
       case "clear":
         setLines(BANNER);
@@ -93,14 +93,14 @@ export default function TerminalConsole({ onClose }: { onClose: () => void }) {
         break;
       case "login":
         setFlow({ cmd: "login", step: "email" });
-        push("вход. введите email:", "dim");
+        push("sign in. enter email:", "dim");
         break;
       case "register":
         setFlow({ cmd: "register", step: "email" });
-        push("регистрация. введите email:", "dim");
+        push("register. enter email:", "dim");
         break;
       default:
-        push(`команда не найдена: ${input}. наберите help`, "err");
+        push(`command not found: ${input}. type help`, "err");
     }
   }
 
@@ -111,10 +111,10 @@ export default function TerminalConsole({ onClose }: { onClose: () => void }) {
     if (flow.cmd === "register") {
       if (flow.step === "email") {
         setFlow({ ...flow, step: "password", email: input });
-        push("придумайте пароль (мин. 8 символов):", "dim");
+        push("choose a password (min. 8 chars):", "dim");
         return;
       }
-      // step password → запрос к API
+      // step password → request to API
       setBusy(true);
       try {
         const res = await fetch("/api/register", {
@@ -124,13 +124,13 @@ export default function TerminalConsole({ onClose }: { onClose: () => void }) {
         });
         const data = await res.json();
         if (res.ok) {
-          push(data.message ?? "письмо отправлено. проверьте почту.", "ok");
-          push("после подтверждения вернитесь и наберите login", "dim");
+          push(data.message ?? "email sent. check your inbox.", "ok");
+          push("once confirmed, come back and type login", "dim");
         } else {
-          push(data.error ?? "ошибка регистрации", "err");
+          push(data.error ?? "registration error", "err");
         }
       } catch {
-        push("сеть недоступна, попробуйте позже", "err");
+        push("network unavailable, try again later", "err");
       } finally {
         setBusy(false);
         setFlow(null);
@@ -142,7 +142,7 @@ export default function TerminalConsole({ onClose }: { onClose: () => void }) {
     if (flow.cmd === "login") {
       if (flow.step === "email") {
         setFlow({ ...flow, step: "password", email: input });
-        push("введите пароль:", "dim");
+        push("enter password:", "dim");
         return;
       }
       if (flow.step === "password") {
@@ -175,30 +175,30 @@ export default function TerminalConsole({ onClose }: { onClose: () => void }) {
       const err = code?.code || code?.error || null;
 
       if (!err) {
-        push("доступ разрешён. загрузка панели…", "ok");
+        push("access granted. loading dashboard…", "ok");
         router.push("/dashboard");
         router.refresh();
         return;
       }
       if (err.includes("2fa_required")) {
-        push("включена двухфакторная защита.", "accent");
-        push("введите 6-значный код из приложения (или backup-код):", "dim");
+        push("two-factor protection is enabled.", "accent");
+        push("enter the 6-digit code from your app (or a backup code):", "dim");
         setFlow({ cmd: "login", step: "totp", email, password });
         return;
       }
       if (err.includes("invalid_2fa")) {
-        push("неверный код 2FA, попробуйте ещё раз:", "err");
-        return; // остаёмся на шаге totp
+        push("invalid 2FA code, try again:", "err");
+        return; // stay on the totp step
       }
       if (err.includes("email_not_verified")) {
-        push("email не подтверждён. проверьте письмо со ссылкой.", "err");
+        push("email not verified. check the link in your inbox.", "err");
         setFlow(null);
         return;
       }
-      push("неверный email или пароль", "err");
+      push("invalid email or password", "err");
       setFlow(null);
     } catch {
-      push("сеть недоступна, попробуйте позже", "err");
+      push("network unavailable, try again later", "err");
       setFlow(null);
     } finally {
       setBusy(false);

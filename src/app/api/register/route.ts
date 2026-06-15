@@ -13,7 +13,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Единый нейтральный ответ — не раскрываем, занят ли email (анти-enumeration).
 const NEUTRAL = NextResponse.json({
   ok: true,
-  message: "Если адрес свободен, на него отправлено письмо с подтверждением.",
+  message: "If the address is available, a confirmation email has been sent.",
 });
 
 export async function POST(req: Request) {
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   const rl = rateLimit(`register:${clientIp(req)}`, 5, 60 * 60 * 1000);
   if (!rl.success) {
     return NextResponse.json(
-      { ok: false, error: "Слишком много попыток. Попробуйте позже." },
+      { ok: false, error: "Too many attempts. Try again later." },
       { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
     );
   }
@@ -38,13 +38,13 @@ export async function POST(req: Request) {
 
   if (!EMAIL_RE.test(email)) {
     return NextResponse.json(
-      { ok: false, error: "Некорректный email." },
+      { ok: false, error: "Invalid email." },
       { status: 400 },
     );
   }
   if (password.length < 8) {
     return NextResponse.json(
-      { ok: false, error: "Пароль — минимум 8 символов." },
+      { ok: false, error: "Password must be at least 8 characters." },
       { status: 400 },
     );
   }
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
     console.error("sendVerificationEmail failed:", err);
     await db.verificationToken.deleteMany({ where: { identifier: email } });
     return NextResponse.json(
-      { ok: false, error: "Не удалось отправить письмо. Проверьте настройки почты." },
+      { ok: false, error: "Could not send the email. Check the mail settings." },
       { status: 500 },
     );
   }

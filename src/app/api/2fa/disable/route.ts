@@ -24,10 +24,10 @@ export async function POST(req: Request) {
 
   const user = await db.user.findUnique({ where: { id: session.user.id } });
   if (!user?.twoFactorEnabled || !user.twoFactorSecret) {
-    return NextResponse.json({ ok: false, error: "2FA не включена." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "2FA is not enabled." }, { status: 400 });
   }
   if (!verifyTOTP(code, user.twoFactorSecret)) {
-    return NextResponse.json({ ok: false, error: "Неверный код." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "Invalid code." }, { status: 400 });
   }
 
   await db.$transaction([

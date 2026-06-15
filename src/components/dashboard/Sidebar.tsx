@@ -16,7 +16,7 @@ export default function Sidebar({ email }: { email: string }) {
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-white/10 bg-bg-soft/60 p-4">
       <div className="mb-6">
-        <div className="text-sm text-accent">yourname.dev</div>
+        <div className="text-sm text-accent">klebold.xyz</div>
         <div className="mt-1 truncate text-xs text-fg-dim" title={email}>
           {email}
         </div>

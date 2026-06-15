@@ -33,7 +33,7 @@ const SITE = () => process.env.SITE_NAME ?? "terminal-site";
 const FROM = () =>
   process.env.EMAIL_FROM ?? `${SITE()} <${process.env.SMTP_USER}>`;
 
-/** Письмо со ссылкой подтверждения регистрации. */
+/** Email with the registration confirmation link. */
 export async function sendVerificationEmail(
   to: string,
   verifyUrl: string,
@@ -42,8 +42,8 @@ export async function sendVerificationEmail(
   await getTransporter().sendMail({
     from: FROM(),
     to,
-    subject: `[${site}] подтверждение регистрации`,
-    text: `Подтвердите email, перейдя по ссылке (действует 24ч):\n${verifyUrl}\n\nЕсли это были не вы — просто игнорируйте письмо.`,
+    subject: `[${site}] confirm your registration`,
+    text: `Confirm your email by opening the link (valid for 24h):\n${verifyUrl}\n\nIf this wasn't you, just ignore this email.`,
     html: terminalEmail(site, verifyUrl),
   });
 }
@@ -57,8 +57,8 @@ function terminalEmail(site: string, url: string): string {
       <div style="color:#39ff14;font-size:13px;margin-bottom:18px">${site} :: auth</div>
       <div style="font-size:14px;line-height:1.6;color:#c8c8c8">
         <span style="color:#39ff14">$</span> register --confirm<br/><br/>
-        Кто-то (надеемся, ты) создал аккаунт.<br/>
-        Подтверди email — ссылка действует <b style="color:#ffb000">24 часа</b>:
+        Someone (hopefully you) created an account.<br/>
+        Confirm your email — the link is valid for <b style="color:#ffb000">24 hours</b>:
       </div>
       <div style="margin:24px 0">
         <a href="${url}" style="display:inline-block;background:#39ff14;color:#0a0a0a;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:bold;font-size:13px">
@@ -66,9 +66,9 @@ function terminalEmail(site: string, url: string): string {
         </a>
       </div>
       <div style="font-size:12px;color:#6a6a6a;line-height:1.6">
-        Если кнопка не работает, открой ссылку вручную:<br/>
+        If the button doesn't work, open the link manually:<br/>
         <span style="color:#6a6a6a;word-break:break-all">${url}</span><br/><br/>
-        Это были не вы? Игнорируйте письмо — аккаунт без подтверждения неактивен.
+        Wasn't you? Ignore this email — an unconfirmed account stays inactive.
       </div>
     </div>
   </div>`;

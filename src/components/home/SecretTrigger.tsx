@@ -1,19 +1,17 @@
 "use client";
 
-// Скрытый, но находимый вход. По умолчанию — тусклый мигающий курсор `_`.
-// При наведении мягко подсвечивается и показывает namёк-подсказку.
-
+// Discreet but findable entrance. A subtle "access _" pill in the corner that
+// brightens on hover. Visible enough to click, quiet enough to stay tasteful.
 export default function SecretTrigger({ onOpen }: { onOpen: () => void }) {
   return (
     <button
       onClick={onOpen}
-      aria-label="открыть консоль входа"
-      className="group fixed bottom-5 right-6 z-30 font-mono text-sm text-fg-dim/40 transition-colors hover:text-accent focus:text-accent focus:outline-none"
+      aria-label="open sign-in console"
+      className="group fixed bottom-5 right-6 z-30 flex items-center gap-1.5 rounded-md border border-white/10 bg-bg-soft/60 px-3 py-1.5 font-mono text-xs text-fg-dim backdrop-blur-sm transition-colors hover:border-accent/40 hover:text-accent focus:border-accent/40 focus:text-accent focus:outline-none"
     >
-      <span className="opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus:opacity-100">
-        access&nbsp;
-      </span>
-      <span className="animate-blink">_</span>
+      <span className="text-accent/70 group-hover:text-accent">$</span>
+      <span>access</span>
+      <span className="animate-blink text-accent">_</span>
     </button>
   );
 }

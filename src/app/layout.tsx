@@ -9,7 +9,7 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "yourname.dev",
+  title: "klebold.xyz",
   description: "personal terminal",
 };
 

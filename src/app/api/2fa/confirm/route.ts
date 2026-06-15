@@ -25,16 +25,16 @@ export async function POST(req: Request) {
   const user = await db.user.findUnique({ where: { id: session.user.id } });
   if (!user?.twoFactorSecret) {
     return NextResponse.json(
-      { ok: false, error: "Сначала запросите настройку (setup)." },
+      { ok: false, error: "Request setup first." },
       { status: 400 },
     );
   }
   if (user.twoFactorEnabled) {
-    return NextResponse.json({ ok: false, error: "2FA уже включена." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "2FA is already enabled." }, { status: 400 });
   }
   if (!verifyTOTP(code, user.twoFactorSecret)) {
     return NextResponse.json(
-      { ok: false, error: "Неверный код. Проверьте время на устройстве." },
+      { ok: false, error: "Invalid code. Check the time on your device." },
       { status: 400 },
     );
   }

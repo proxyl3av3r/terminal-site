@@ -27,12 +27,12 @@ export default function TwoFactorSetup({ initialEnabled }: { initialEnabled: boo
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "ошибка");
+        setError(data.error ?? "error");
         return null;
       }
       return data;
     } catch {
-      setError("сеть недоступна");
+      setError("network unavailable");
       return null;
     } finally {
       setBusy(false);
@@ -86,7 +86,7 @@ export default function TwoFactorSetup({ initialEnabled }: { initialEnabled: boo
         </span>
       </div>
       <p className="mb-4 text-xs text-fg-dim">
-        TOTP-коды совместимы с Google Authenticator и Bitwarden.
+        TOTP codes are compatible with Google Authenticator and Bitwarden.
       </p>
 
       {error && <p className="mb-3 text-xs text-danger">⚠ {error}</p>}
@@ -98,7 +98,7 @@ export default function TwoFactorSetup({ initialEnabled }: { initialEnabled: boo
           disabled={busy}
           className="rounded bg-accent px-4 py-2 font-mono text-sm text-bg disabled:opacity-50"
         >
-          &gt; включить 2FA
+          &gt; enable 2FA
         </button>
       )}
 
@@ -106,7 +106,7 @@ export default function TwoFactorSetup({ initialEnabled }: { initialEnabled: boo
       {stage === "setup" && (
         <div className="space-y-4">
           <p className="text-xs text-fg-dim">
-            1. отсканируйте QR или внесите ключ вручную:
+            1. scan the QR or enter the key manually:
           </p>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             {qr && (
@@ -117,14 +117,14 @@ export default function TwoFactorSetup({ initialEnabled }: { initialEnabled: boo
               />
             )}
             <div className="space-y-2">
-              <p className="text-xs text-fg-dim">ключ для ручного ввода:</p>
+              <p className="text-xs text-fg-dim">manual entry key:</p>
               <code className="block break-all rounded bg-black/40 p-2 font-mono text-xs text-accent-amber">
                 {manualKey}
               </code>
             </div>
           </div>
 
-          <p className="text-xs text-fg-dim">2. введите код из приложения:</p>
+          <p className="text-xs text-fg-dim">2. enter the code from your app:</p>
           <div className="flex gap-2">
             <input
               value={code}
@@ -139,7 +139,7 @@ export default function TwoFactorSetup({ initialEnabled }: { initialEnabled: boo
               disabled={busy || code.length < 6}
               className="rounded bg-accent px-4 py-2 font-mono text-sm text-bg disabled:opacity-50"
             >
-              подтвердить
+              confirm
             </button>
           </div>
         </div>
@@ -148,12 +148,12 @@ export default function TwoFactorSetup({ initialEnabled }: { initialEnabled: boo
       {/* ── ВКЛЮЧЕНО: backup-коды + управление ── */}
       {stage === "enabled" && (
         <div className="space-y-4">
-          <p className="text-xs text-accent">✓ двухфакторная защита активна</p>
+          <p className="text-xs text-accent">✓ two-factor protection is active</p>
 
           {backupCodes && (
             <div className="rounded border border-accent-amber/30 bg-black/40 p-3">
               <p className="mb-2 text-xs text-accent-amber">
-                сохраните backup-коды — показываются один раз, каждый одноразовый:
+                save these backup codes — shown once, each is single-use:
               </p>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 font-mono text-sm text-fg">
                 {backupCodes.map((c) => (
@@ -169,13 +169,13 @@ export default function TwoFactorSetup({ initialEnabled }: { initialEnabled: boo
               disabled={busy}
               className="rounded border border-white/15 px-3 py-1.5 font-mono text-xs text-fg-dim hover:text-fg disabled:opacity-50"
             >
-              перевыпустить backup-коды
+              regenerate backup codes
             </button>
           </div>
 
           <div className="border-t border-white/10 pt-4">
             <p className="mb-2 text-xs text-fg-dim">
-              отключить 2FA (требуется текущий код):
+              disable 2FA (current code required):
             </p>
             <div className="flex gap-2">
               <input
@@ -191,7 +191,7 @@ export default function TwoFactorSetup({ initialEnabled }: { initialEnabled: boo
                 disabled={busy || code.length < 6}
                 className="rounded border border-danger/40 px-4 py-2 font-mono text-sm text-danger hover:bg-danger/10 disabled:opacity-50"
               >
-                отключить
+                disable
               </button>
             </div>
           </div>

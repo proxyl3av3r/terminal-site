@@ -21,7 +21,7 @@ export async function POST() {
   }
   if (user.twoFactorEnabled) {
     return NextResponse.json(
-      { ok: false, error: "2FA уже включена. Сначала отключите её." },
+      { ok: false, error: "2FA is already enabled. Disable it first." },
       { status: 400 },
     );
   }

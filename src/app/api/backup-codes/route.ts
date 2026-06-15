@@ -16,7 +16,7 @@ export async function POST() {
 
   const user = await db.user.findUnique({ where: { id: session.user.id } });
   if (!user?.twoFactorEnabled) {
-    return NextResponse.json({ ok: false, error: "2FA не включена." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "2FA is not enabled." }, { status: 400 });
   }
 
   const plainCodes = generateBackupCodes();
