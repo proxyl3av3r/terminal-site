@@ -1,0 +1,103 @@
+// Prisma schema — модели БД для Auth.js v5 + email-верификация + 2FA.
+// Генерация клиента: `npx prisma generate`
+// Применить к БД:    `npx prisma migrate dev --name init`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Ядро Auth.js (контракт PrismaAdapter). Account/Session нужны даже при
+// credentials-провайдере, т.к. сессии храним в БД (strategy: "database").
+// ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  // Хеш пароля (argon2). null допустим теоретически (напр. OAuth), но у нас
+  // всегда заполнен при регистрации через credentials.
+  passwordHash  String?
+  // Время подтверждения email. Пока null — вход запрещён.
+  emailVerified DateTime?
+  name          String?
+  image         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 2FA: секрет TOTP (base32). Включена ли 2FA — флаг twoFactorEnabled.
+  twoFactorSecret  String?
+  twoFactorEnabled Boolean @default(false)
+
+  accounts    Account[]
+  sessions    Session[]
+  backupCodes BackupCode[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// Универсальная таблица одноразовых токенов: и для верификации email,
+// и (при желании) для сброса пароля. Auth.js использует её формат.
+// Важно: в БД храним ХЕШ токена, не сам токен (см. src/lib/tokens.ts).
+model VerificationToken {
+  identifier String // email пользователя
+  token      String // sha256-хеш токена из письма
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Backup-коды для 2FA: 10 штук, одноразовые. Храним хеш (argon2),
+// помечаем usedAt при использовании, чтобы не дать повторно.
+// ─────────────────────────────────────────────────────────────────────
+
+model BackupCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("backup_codes")
+}
