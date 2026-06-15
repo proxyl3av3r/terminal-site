@@ -37,6 +37,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# argon2 — нативный модуль. standalone-трассировка не включает его .node-бинарник,
+# поэтому копируем пакет целиком (вместе с prebuilds) поверх standalone.
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/argon2 ./node_modules/argon2
+
 USER nextjs
 EXPOSE 3000
 CMD ["node", "server.js"]
