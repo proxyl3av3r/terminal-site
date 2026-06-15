@@ -15,7 +15,7 @@ const nextConfig = {
       "default-src 'self'",
       `script-src 'self' 'unsafe-inline'${isProd ? "" : " 'unsafe-eval'"}`,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
+      "img-src 'self' data: blob: https://i.scdn.co",
       "font-src 'self' data:",
       "connect-src 'self'",
       "object-src 'none'",

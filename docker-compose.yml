@@ -47,6 +47,10 @@ services:
       SMTP_PASS: ${SMTP_PASS}
       EMAIL_FROM: ${EMAIL_FROM}
       SITE_NAME: ${SITE_NAME}
+      TOKEN_ENC_KEY: ${TOKEN_ENC_KEY}
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
+      SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI}
     depends_on:
       migrate:
         condition: service_completed_successfully

@@ -34,6 +34,10 @@ model User {
   twoFactorSecret  String?
   twoFactorEnabled Boolean @default(false)
 
+  // Spotify refresh-токен, ЗАШИФРОВАННЫЙ (AES-256-GCM, см. lib/crypto.ts).
+  // scope строго user-read-currently-playing. null = не подключён.
+  spotifyToken String?
+
   accounts    Account[]
   sessions    Session[]
   backupCodes BackupCode[]
