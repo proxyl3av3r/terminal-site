@@ -3,6 +3,13 @@ import { randomBytes, createHash } from "crypto";
 // TTL токена верификации email — 24 часа.
 export const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 
+// TTL токена сброса пароля — 1 час (короче, т.к. чувствительнее).
+export const RESET_TTL_MS = 60 * 60 * 1000;
+
+// Префикс identifier для reset-токенов — чтобы не путать с email-верификацией
+// в той же таблице VerificationToken.
+export const RESET_PREFIX = "reset:";
+
 /**
  * Генерируем криптослучайный токен. В письмо/ссылку уходит СЫРОЙ токен,
  * а в БД кладём только его sha256-хеш — утечка БД не даёт готовых токенов.

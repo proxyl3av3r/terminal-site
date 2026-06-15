@@ -48,27 +48,64 @@ export async function sendVerificationEmail(
   });
 }
 
+/** Email with the password reset link. */
+export async function sendPasswordResetEmail(
+  to: string,
+  resetUrl: string,
+): Promise<void> {
+  const site = SITE();
+  await getTransporter().sendMail({
+    from: FROM(),
+    to,
+    subject: `[${site}] password reset`,
+    text: `Reset your password by opening the link (valid for 1h):\n${resetUrl}\n\nIf you didn't request this, ignore this email — your password stays unchanged.`,
+    html: terminalEmail(site, resetUrl, {
+      cmd: "passwd --reset",
+      body: "A password reset was requested for your account.<br/>Set a new password — the link is valid for <b style=\"color:#ffb000\">1 hour</b>:",
+      button: "&gt; reset_password",
+      footer:
+        "Didn't request this? Ignore this email — your password stays unchanged.",
+    }),
+  });
+}
+
 // Минималистичный «терминальный» шаблон. Inline-стили — почтовые клиенты
 // не любят внешний/блочный CSS.
-function terminalEmail(site: string, url: string): string {
+interface EmailCopy {
+  cmd: string;
+  body: string;
+  button: string;
+  footer: string;
+}
+function terminalEmail(site: string, url: string, copy?: EmailCopy): string {
+  const c: EmailCopy = copy ?? {
+    cmd: "register --confirm",
+    body: "Someone (hopefully you) created an account.<br/>Confirm your email — the link is valid for <b style=\"color:#ffb000\">24 hours</b>:",
+    button: "&gt; confirm_email",
+    footer:
+      "Wasn't you? Ignore this email — an unconfirmed account stays inactive.",
+  };
+  return tpl(site, url, c);
+}
+
+function tpl(site: string, url: string, c: EmailCopy): string {
   return `
   <div style="background:#0a0a0a;padding:32px;font-family:ui-monospace,Menlo,Consolas,monospace;color:#c8c8c8">
     <div style="max-width:520px;margin:0 auto;border:1px solid #1e1e1e;border-radius:8px;padding:28px;background:#101010">
       <div style="color:#39ff14;font-size:13px;margin-bottom:18px">${site} :: auth</div>
       <div style="font-size:14px;line-height:1.6;color:#c8c8c8">
-        <span style="color:#39ff14">$</span> register --confirm<br/><br/>
-        Someone (hopefully you) created an account.<br/>
-        Confirm your email — the link is valid for <b style="color:#ffb000">24 hours</b>:
+        <span style="color:#39ff14">$</span> ${c.cmd}<br/><br/>
+        ${c.body}
       </div>
       <div style="margin:24px 0">
         <a href="${url}" style="display:inline-block;background:#39ff14;color:#0a0a0a;text-decoration:none;padding:12px 20px;border-radius:6px;font-weight:bold;font-size:13px">
-          &gt; confirm_email
+          ${c.button}
         </a>
       </div>
       <div style="font-size:12px;color:#6a6a6a;line-height:1.6">
         If the button doesn't work, open the link manually:<br/>
         <span style="color:#6a6a6a;word-break:break-all">${url}</span><br/><br/>
-        Wasn't you? Ignore this email — an unconfirmed account stays inactive.
+        ${c.footer}
       </div>
     </div>
   </div>`;
