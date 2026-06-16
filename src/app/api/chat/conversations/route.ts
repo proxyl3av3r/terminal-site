@@ -19,10 +19,12 @@ export async function GET() {
     select: {
       id: true,
       isGroup: true,
+      kind: true,
       name: true,
       members: {
         select: {
           userId: true,
+          role: true,
           user: { select: { username: true, shortId: true, avatar: true } },
         },
       },
@@ -39,7 +41,11 @@ export async function GET() {
     .map((c) => ({
       id: c.id,
       isGroup: c.isGroup,
+      kind: c.kind,
       name: c.name,
+      // Моя роль — чтобы клиент решал, показывать ли композер/шестерёнку.
+      myRole: c.members.find((m) => m.userId === me)?.role ?? "member",
+      memberCount: c.members.length,
       members: c.members.filter((m) => m.userId !== me).map((m) => m.user),
       last: c.messages[0] ?? null,
     }))
@@ -52,21 +58,31 @@ export async function GET() {
   return NextResponse.json({ ok: true, conversations: list });
 }
 
-// Создать DM (targetUserId) или группу (isGroup + name + memberIds[]).
+// Создать DM (targetUserId) или группу/канал (kind + name + memberIds[]).
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ ok: false }, { status: 401 });
   const me = session.user.id;
 
-  let body: { targetUserId?: string; isGroup?: boolean; name?: string; memberIds?: string[] };
+  let body: {
+    targetUserId?: string;
+    isGroup?: boolean;
+    kind?: string;
+    name?: string;
+    memberIds?: string[];
+  };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
   }
 
+  // Тип: dm по умолчанию; group/channel — если явно передан (isGroup — legacy).
+  const kind =
+    body.kind === "channel" ? "channel" : body.kind === "group" || body.isGroup ? "group" : "dm";
+
   // ── DM ──
-  if (!body.isGroup) {
+  if (kind === "dm") {
     const target = String(body.targetUserId ?? "");
     if (!target || target === me) {
       return NextResponse.json({ ok: false, error: "invalid target" }, { status: 400 });
@@ -80,8 +96,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, id });
   }
 
-  // ── Группа ──
-  const name = String(body.name ?? "").trim().slice(0, 60) || "group";
+  // ── Группа / канал ──
+  const name = String(body.name ?? "").trim().slice(0, 60) || (kind === "channel" ? "channel" : "group");
   const ids = Array.from(new Set([me, ...(body.memberIds ?? []).map(String)]));
   if (ids.length < 2) {
     return NextResponse.json({ ok: false, error: "need at least one other member" }, { status: 400 });
@@ -91,6 +107,7 @@ export async function POST(req: Request) {
   const convo = await db.conversation.create({
     data: {
       isGroup: true,
+      kind,
       name,
       members: {
         create: valid.map((u) => ({
@@ -101,7 +118,7 @@ export async function POST(req: Request) {
     },
     select: { id: true },
   });
-  // Участникам группы — обновить список диалогов.
+  // Участникам — обновить список диалогов.
   void notifyRealtime(
     valid.filter((u) => u.id !== me).map((u) => userRoom(u.id)),
     "conversation:bump",

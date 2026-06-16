@@ -5,6 +5,8 @@ import Avatar from "@/components/avatar/Avatar";
 import { parseAvatar } from "@/lib/avatar";
 import { imageToAscii } from "@/lib/ascii";
 import { getChatSocket } from "@/lib/socket";
+import { canPost, canDeleteMessage } from "@/lib/roles";
+import ManagePanel from "@/components/chat/ManagePanel";
 
 interface PublicUser {
   username: string | null;
@@ -14,7 +16,10 @@ interface PublicUser {
 interface Conversation {
   id: string;
   isGroup: boolean;
+  kind: string;
   name: string | null;
+  myRole: string;
+  memberCount: number;
   members: PublicUser[];
   last: { body: string; kind: string; createdAt: string; senderId: string } | null;
 }
@@ -58,6 +63,7 @@ export default function ChatClient({
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const [showNew, setShowNew] = useState(false);
+  const [manageId, setManageId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true); // юзер сейчас внизу переписки?
@@ -146,6 +152,19 @@ export default function ChatClient({
       loadConvos();
       loadRequests();
     };
+    // Поменяли состав/роли/имя — обновить список и (если открыт) сам чат.
+    const onUpdated = (p: { conversationId?: string }) => {
+      loadConvos();
+      if (p?.conversationId && p.conversationId === activeIdRef.current) {
+        loadMessages(p.conversationId);
+      }
+    };
+    // Сообщение удалили — перечитать открытую переписку.
+    const onMsgDeleted = (p: { conversationId?: string }) => {
+      if (p?.conversationId && p.conversationId === activeIdRef.current) {
+        loadMessages(p.conversationId);
+      }
+    };
     const onPresence = (p: { conversationId?: string; userId?: string; online?: boolean }) => {
       if (!p?.userId || p.conversationId !== activeIdRef.current) return;
       setOnlineIds((prev) => {
@@ -175,6 +194,8 @@ export default function ChatClient({
 
     socket.on("message", onMessage);
     socket.on("conversation:bump", onBump);
+    socket.on("conversation:updated", onUpdated);
+    socket.on("message:deleted", onMsgDeleted);
     socket.on("request:new", onRequest);
     socket.on("conversation:removed", onRemoved);
     socket.on("presence", onPresence);
@@ -183,6 +204,8 @@ export default function ChatClient({
     return () => {
       socket.off("message", onMessage);
       socket.off("conversation:bump", onBump);
+      socket.off("conversation:updated", onUpdated);
+      socket.off("message:deleted", onMsgDeleted);
       socket.off("request:new", onRequest);
       socket.off("conversation:removed", onRemoved);
       socket.off("presence", onPresence);
@@ -281,7 +304,20 @@ export default function ChatClient({
     }
   }
 
+  // Удалить сообщение (своё или, если хватает прав, чужое). Realtime разошлёт.
+  async function deleteMessage(messageId: string) {
+    if (!activeId || !confirm("delete this message?")) return;
+    const res = await fetch(`/api/chat/conversations/${activeId}/messages/${messageId}`, {
+      method: "DELETE",
+    });
+    const data = await res.json();
+    if (data.ok) setMessages((m) => m.filter((x) => x.id !== messageId));
+    else if (data.error) alert(data.error);
+  }
+
   const active = convos.find((c) => c.id === activeId);
+  // Могу ли писать в активный чат (в канале — только admin+).
+  const canPostHere = active ? canPost(active.kind, active.myRole) : false;
   // onlineIds включает меня (я в комнате) — для статуса собеседника исключаем.
   const othersOnline = [...onlineIds].filter((id) => id !== meId);
 
@@ -331,7 +367,7 @@ export default function ChatClient({
                 >
                   {c.isGroup ? (
                     <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-white/10 bg-black/40 font-mono text-xs text-accent">
-                      #
+                      {c.kind === "channel" ? "📡" : "#"}
                     </span>
                   ) : (
                     c.members[0] && (
@@ -404,6 +440,7 @@ export default function ChatClient({
               >
                 ‹
               </button>
+              {active.kind === "channel" && <span className="text-fg-dim">📡</span>}
               <span>{titleOf(active)}</span>
               {!active.isGroup && othersOnline.length > 0 && (
                 <span className="flex items-center gap-1 text-[11px] text-accent">
@@ -413,15 +450,22 @@ export default function ChatClient({
               )}
               {active.isGroup && (
                 <span className="ml-2 text-xs text-fg-dim">
-                  {active.members.length + 1} members
+                  {active.kind === "channel" ? "channel · " : ""}
+                  {active.memberCount} members
                   {othersOnline.length > 0 && ` · ${othersOnline.length} online`}
                 </span>
               )}
               {peerTyping && (
-                <span className="ml-auto animate-pulse text-[11px] text-fg-dim">
-                  typing…
-                </span>
+                <span className="animate-pulse text-[11px] text-fg-dim">typing…</span>
               )}
+              <button
+                onClick={() => setManageId(active.id)}
+                aria-label="manage chat"
+                title="manage"
+                className="ml-auto shrink-0 text-fg-dim hover:text-accent"
+              >
+                ⚙
+              </button>
             </div>
 
             <div
@@ -442,10 +486,11 @@ export default function ChatClient({
                   prev.senderId !== m.senderId ||
                   +new Date(m.createdAt) - +new Date(prev.createdAt) > 5 * 60_000;
 
+                const canDel = canDeleteMessage(active.myRole, mine);
                 return (
                   <div
                     key={m.id}
-                    className={`flex gap-2 ${mine ? "flex-row-reverse" : ""} ${groupStart ? "mt-3" : ""}`}
+                    className={`group flex gap-2 ${mine ? "flex-row-reverse" : ""} ${groupStart ? "mt-3" : ""}`}
                   >
                     {/* колонка аватара: показываем только в начале группы */}
                     <div className="w-7 shrink-0">
@@ -472,49 +517,65 @@ export default function ChatClient({
                         </div>
                       )}
                     </div>
+                    {canDel && (
+                      <button
+                        onClick={() => deleteMessage(m.id)}
+                        aria-label="delete message"
+                        title="delete"
+                        className="self-center px-1 font-mono text-xs text-fg-dim opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                      >
+                        ×
+                      </button>
+                    )}
                   </div>
                 );
               })}
             </div>
 
-            <form
-              onSubmit={(e) => { e.preventDefault(); send(); }}
-              className="flex items-center gap-2 border-t border-white/10 px-3 py-2.5"
-            >
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                aria-label="attach image as ASCII"
-                className="shrink-0 font-mono text-base text-fg-dim hover:text-accent"
-                title="send image as ASCII"
+            {canPostHere ? (
+              <form
+                onSubmit={(e) => { e.preventDefault(); send(); }}
+                className="flex items-center gap-2 border-t border-white/10 px-3 py-2.5"
               >
-                ▤
-              </button>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) sendImage(f);
-                  e.target.value = "";
-                }}
-              />
-              <input
-                value={text}
-                onChange={(e) => {
-                  setText(e.target.value);
-                  emitTyping();
-                }}
-                placeholder="message…"
-                maxLength={2000}
-                className="flex-1 bg-transparent text-sm text-fg caret-accent outline-none"
-              />
-              <button type="submit" className="rounded bg-accent px-3 py-1.5 font-mono text-xs text-bg">
-                send
-              </button>
-            </form>
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  aria-label="attach image as ASCII"
+                  className="shrink-0 font-mono text-base text-fg-dim hover:text-accent"
+                  title="send image as ASCII"
+                >
+                  ▤
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) sendImage(f);
+                    e.target.value = "";
+                  }}
+                />
+                <input
+                  value={text}
+                  onChange={(e) => {
+                    setText(e.target.value);
+                    emitTyping();
+                  }}
+                  placeholder="message…"
+                  maxLength={2000}
+                  className="flex-1 bg-transparent text-sm text-fg caret-accent outline-none"
+                />
+                <button type="submit" className="rounded bg-accent px-3 py-1.5 font-mono text-xs text-bg">
+                  send
+                </button>
+              </form>
+            ) : (
+              <div className="border-t border-white/10 px-4 py-3 text-center font-mono text-xs text-fg-dim">
+                🔒 only admins can post in this channel
+              </div>
+            )}
           </>
         )}
       </div>
@@ -525,6 +586,19 @@ export default function ChatClient({
           onCreated={(id) => {
             setShowNew(false);
             setActiveId(id);
+            loadConvos();
+          }}
+        />
+      )}
+
+      {manageId && (
+        <ManagePanel
+          conversationId={manageId}
+          meId={meId}
+          onClose={() => setManageId(null)}
+          onRemoved={() => {
+            setManageId(null);
+            if (activeId === manageId) setActiveId(null);
             loadConvos();
           }}
         />
@@ -543,13 +617,14 @@ function NewChat({
   onClose: () => void;
   onCreated: (id: string) => void;
 }) {
-  const [mode, setMode] = useState<"direct" | "group">("direct");
+  const [mode, setMode] = useState<"direct" | "group" | "channel">("direct");
   const [q, setQ] = useState("");
   const [found, setFound] = useState<FoundUser | null | "none">(null);
   const [busy, setBusy] = useState(false);
-  // ── группа ──
+  // ── группа / канал ──
   const [groupName, setGroupName] = useState("");
   const [members, setMembers] = useState<FoundUser[]>([]);
+  const multi = mode !== "direct"; // общий UI для группы и канала
 
   async function lookup() {
     setFound(null);
@@ -579,7 +654,7 @@ function NewChat({
     setFound(null);
   }
 
-  async function createGroup() {
+  async function createMulti() {
     const name = groupName.trim();
     if (!name || members.length === 0) return;
     setBusy(true);
@@ -587,7 +662,7 @@ function NewChat({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        isGroup: true,
+        kind: mode, // "group" | "channel"
         name,
         memberIds: members.map((m) => m.id),
       }),
@@ -597,7 +672,7 @@ function NewChat({
     if (data.ok) onCreated(data.id);
   }
 
-  const switchMode = (m: "direct" | "group") => {
+  const switchMode = (m: "direct" | "group" | "channel") => {
     setMode(m);
     setQ("");
     setFound(null);
@@ -613,32 +688,35 @@ function NewChat({
 
         {/* переключатель режима */}
         <div className="mb-3 flex gap-1">
-          <button
-            onClick={() => switchMode("direct")}
-            className={`rounded px-2.5 py-1 font-mono text-xs ${mode === "direct" ? "bg-accent/15 text-accent" : "text-fg-dim hover:text-fg"}`}
-          >
-            direct
-          </button>
-          <button
-            onClick={() => switchMode("group")}
-            className={`rounded px-2.5 py-1 font-mono text-xs ${mode === "group" ? "bg-accent/15 text-accent" : "text-fg-dim hover:text-fg"}`}
-          >
-            group
-          </button>
+          {(["direct", "group", "channel"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => switchMode(m)}
+              className={`rounded px-2.5 py-1 font-mono text-xs ${mode === m ? "bg-accent/15 text-accent" : "text-fg-dim hover:text-fg"}`}
+            >
+              {m}
+            </button>
+          ))}
         </div>
 
-        {mode === "group" && (
+        {mode === "channel" && (
+          <p className="mb-3 text-[11px] text-fg-dim">
+            broadcast: only admins post, members read. add the first subscribers below.
+          </p>
+        )}
+
+        {multi && (
           <input
             value={groupName}
             onChange={(e) => setGroupName(e.target.value)}
-            placeholder="group name"
+            placeholder={mode === "channel" ? "channel name" : "group name"}
             maxLength={60}
             className="mb-3 w-full rounded border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm text-fg outline-none focus:border-accent"
           />
         )}
 
-        {/* выбранные участники (только для группы) */}
-        {mode === "group" && members.length > 0 && (
+        {/* выбранные участники (группа/канал) */}
+        {multi && members.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-1.5">
             {members.map((m) => (
               <span
@@ -660,7 +738,7 @@ function NewChat({
         )}
 
         <p className="mb-2 text-xs text-fg-dim">
-          {mode === "group" ? "add members by" : "find by"} @username, #123456 or email
+          {multi ? "add members by" : "find by"} @username, #123456 or email
         </p>
         <div className="flex gap-2">
           <input
@@ -679,14 +757,14 @@ function NewChat({
         {found === "none" && <p className="mt-3 text-xs text-danger">no user found</p>}
         {found && found !== "none" && (
           <button
-            onClick={() => (mode === "group" ? addMember(found) : start(found.id))}
-            disabled={busy || (mode === "group" && members.some((x) => x.id === found.id))}
+            onClick={() => (multi ? addMember(found) : start(found.id))}
+            disabled={busy || (multi && members.some((x) => x.id === found.id))}
             className="mt-3 flex w-full items-center gap-2 rounded border border-white/10 p-2 hover:border-accent/40 disabled:opacity-50"
           >
             <Avatar config={parseAvatar(found.avatar, seedOf(found))} size={32} />
             <span className="font-mono text-sm text-fg">@{found.username ?? "user"}</span>
             <span className="ml-auto font-mono text-xs text-accent">
-              {mode === "group"
+              {multi
                 ? members.some((x) => x.id === found.id)
                   ? "added"
                   : "+ add"
@@ -695,13 +773,13 @@ function NewChat({
           </button>
         )}
 
-        {mode === "group" && (
+        {multi && (
           <button
-            onClick={createGroup}
+            onClick={createMulti}
             disabled={busy || !groupName.trim() || members.length === 0}
             className="mt-4 w-full rounded bg-accent py-2 font-mono text-xs text-bg disabled:opacity-40"
           >
-            create group{members.length > 0 ? ` · ${members.length + 1} members` : ""}
+            create {mode}{members.length > 0 ? ` · ${members.length + 1} members` : ""}
           </button>
         )}
       </div>

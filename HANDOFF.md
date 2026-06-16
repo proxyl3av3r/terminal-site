@@ -61,8 +61,19 @@ sound/matrix/login/...`), easter eggs (`sudo`, Konami-код), темы (green/a
 - Виджеты: online-счётчик (in-memory presence), эквалайзер (декоративный).
 
 **Чат (мессенджер):**
-- DM и группы (`Conversation`/`ConversationMember`/`Message`). Создание групп — из модалки
-  `NewChat` (режим group: имя + участники), в списке у групп иконка-заглушка `#`.
+- **DM / группы / каналы** (`Conversation.kind` = `dm|group|channel`; `isGroup` — legacy, держим
+  синхронным). Создание — из модалки `NewChat` (direct/group/channel). Канал = broadcast: писать
+  могут только admin+ (member — read-only), композер у member скрыт.
+- **Управление чатами (ТГ-стайл), панель `ManagePanel` (шестерёнка в шапке):**
+  - Роли `owner > admin > moderator > member`. Чистая логика прав — `src/lib/roles.ts` (без БД,
+    шарится клиентом и сервером; `lib/chat.ts` её ре-экспортит).
+  - Промоут/демоут ролей, **передача владения** (owner → admin себя), кик участников (по иерархии),
+    добавление участников (admin+), переименование (admin+).
+  - **Удаление чата** (DM — любой участник; группа/канал — только owner), **выход** (owner не может
+    выйти, пока есть другие — сначала передать владение/удалить).
+  - **Удаление сообщений** (своё — всегда; чужое — moderator+), кнопка `×` по ховеру.
+  - **Invite-ссылки**: `Conversation.inviteToken` (одна активная, перегенерация отзывает старую),
+    страница вступления `/dashboard/chat/join/[token]`.
 - **Система запросов:** новый DM = pending у получателя; вкладка `requests` → accept/decline;
   писать нельзя пока не accepted.
 - Сообщения: text + **ASCII-картинки** (кнопка `▤`, конверт в браузере, хранится текстом).
@@ -110,9 +121,11 @@ sound/matrix/login/...`), easter eggs (`sudo`, Konami-код), темы (green/a
    мгновенная доставка). Деплой: добавить `REALTIME_SECRET` в `.env` на VPS + обновить nginx-конфиг
    (`location /socket.io/`). Подробности — в «Ключевых решениях».
 2. **Стикеры** — набор готовых ASCII-артов (эмодзи уже работают как юникод-текст).
-3. ✅ ~~**UI создания групп**~~ — СДЕЛАНО (в модалке `NewChat` переключатель direct/group: имя +
-   выбор участников по @нику/#id/email, чипы участников). Бэкенд `isGroup` был готов; группы
-   создаются сразу как accepted (без запроса), участники получают realtime-`bump`.
+3. ✅ ~~**UI создания групп**~~ — СДЕЛАНО (модалка `NewChat`: direct/group/channel).
+3b. ✅ ~~**Полное управление чатами/группами/каналами**~~ — СДЕЛАНО: роли (owner/admin/moderator/
+   member), панель `ManagePanel`, каналы (broadcast), invite-ссылки, удаление/выход, удаление
+   сообщений. Миграция `20260616120000_chat_management` (`kind` + `inviteToken`). Детали — в
+   разделах «Что сделано» и «Ключевые решения».
 4. **Фаза 4 — игра рисовалка-угадайка:** комнаты по ссылке/id, холст с цветами, чат сбоку, логика
    слова, подсказки «горячо/холодно». Realtime — переиспользовать сервис `realtime/` (добавить
    game-namespace/события, источник истины — также Next-ручки или сам сервис).
@@ -126,8 +139,9 @@ sound/matrix/login/...`), easter eggs (`sudo`, Konami-код), темы (green/a
 src/app/            — страницы (home, dashboard/*, api/*)
 src/components/      — home/, terminal/, chat/, dashboard/, avatar/, canvas/
 src/lib/            — auth, db, email, tokens, 2fa, ratelimit, crypto, spotify,
-                      profile, avatar, chat, ascii, realtime (server→socket),
-                      socket (client singleton socket.io-client)
+                      profile, avatar, chat, roles (чистая логика прав, client-safe),
+                      ascii, realtime (server→socket), socket (client socket.io-client)
+src/components/chat/ — ChatClient, ManagePanel (управление), JoinInvite (вступление по ссылке)
 realtime/           — отдельный Socket.IO-сервис (server.mjs, Dockerfile) — свой контейнер
 prisma/             — schema.prisma + migrations/
 Dockerfile, docker-compose.yml, deploy/nginx.conf.example, DEPLOY.md

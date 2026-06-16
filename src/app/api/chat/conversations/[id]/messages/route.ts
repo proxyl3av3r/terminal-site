@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { rateLimit, clientIp } from "@/lib/ratelimit";
-import { isMember, memberState, MAX_TEXT, MAX_ASCII } from "@/lib/chat";
+import { isMember, getMembership, canPost, MAX_TEXT, MAX_ASCII } from "@/lib/chat";
 import { notifyRealtime, convRoom, userRoom } from "@/lib/realtime";
 
 export const runtime = "nodejs";
@@ -54,11 +54,22 @@ export async function POST(
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ ok: false }, { status: 401 });
   // Писать можно только в принятый диалог (получатель запроса — после accept).
-  const state = await memberState(params.id, session.user.id);
-  if (state === null) return NextResponse.json({ ok: false }, { status: 403 });
-  if (state !== "accepted") {
+  const me = await getMembership(params.id, session.user.id);
+  if (me === null) return NextResponse.json({ ok: false }, { status: 403 });
+  if (me.state !== "accepted") {
     return NextResponse.json(
       { ok: false, error: "accept the request first" },
+      { status: 403 },
+    );
+  }
+  // В канале писать могут только admin+ (остальные — read-only).
+  const convo = await db.conversation.findUnique({
+    where: { id: params.id },
+    select: { kind: true },
+  });
+  if (convo && !canPost(convo.kind, me.role)) {
+    return NextResponse.json(
+      { ok: false, error: "only admins can post here" },
       { status: 403 },
     );
   }

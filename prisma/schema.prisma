@@ -62,8 +62,12 @@ model User {
 
 model Conversation {
   id        String   @id @default(cuid())
-  isGroup   Boolean  @default(false)
-  name      String? // имя группы (для DM — null)
+  isGroup   Boolean  @default(false) // legacy-флаг, держим синхронным с kind (kind != "dm")
+  // Тип чата: dm (1:1) | group (общий чат) | channel (broadcast, пишут только admin+).
+  kind      String   @default("dm")
+  name      String? // имя группы/канала (для DM — null)
+  // Публичный токен-приглашение (одна активная ссылка; перегенерация отзывает старую).
+  inviteToken String? @unique
   createdAt DateTime @default(now())
 
   members  ConversationMember[]
@@ -76,7 +80,7 @@ model ConversationMember {
   id             String    @id @default(cuid())
   conversationId String
   userId         String
-  role           String    @default("member") // owner | member
+  role           String    @default("member") // owner | admin | moderator | member
   // accepted — обычный участник; pending — входящий запрос (ещё не принят).
   state          String    @default("accepted")
   joinedAt       DateTime  @default(now())

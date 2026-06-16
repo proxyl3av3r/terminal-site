@@ -1,7 +1,14 @@
+import { randomBytes } from "crypto";
 import { db } from "@/lib/db";
+
+// Роли/права — чистая логика в lib/roles (без БД, шарится с клиентом).
+export * from "@/lib/roles";
 
 export const MAX_TEXT = 2000;
 export const MAX_ASCII = 12000;
+
+/** Сгенерировать токен для invite-ссылки (urlsafe). */
+export const newInviteToken = (): string => randomBytes(12).toString("base64url");
 
 /** Статус участия (accepted/pending) или null, если не участник. */
 export async function memberState(
@@ -13,6 +20,18 @@ export async function memberState(
     select: { state: true },
   });
   return m?.state ?? null;
+}
+
+/** Полное членство: роль + статус (или null, если не участник). */
+export async function getMembership(
+  conversationId: string,
+  userId: string,
+): Promise<{ role: string; state: string } | null> {
+  const m = await db.conversationMember.findUnique({
+    where: { conversationId_userId: { conversationId, userId } },
+    select: { role: true, state: true },
+  });
+  return m ?? null;
 }
 
 /** Состоит ли пользователь в диалоге (любой статус). */
