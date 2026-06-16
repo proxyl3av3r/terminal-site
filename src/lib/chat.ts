@@ -3,33 +3,40 @@ import { db } from "@/lib/db";
 export const MAX_TEXT = 2000;
 export const MAX_ASCII = 12000;
 
-/** Состоит ли пользователь в диалоге (доступ к чтению/записи). */
+/** Статус участия (accepted/pending) или null, если не участник. */
+export async function memberState(
+  conversationId: string,
+  userId: string,
+): Promise<string | null> {
+  const m = await db.conversationMember.findUnique({
+    where: { conversationId_userId: { conversationId, userId } },
+    select: { state: true },
+  });
+  return m?.state ?? null;
+}
+
+/** Состоит ли пользователь в диалоге (любой статус). */
 export async function isMember(
   conversationId: string,
   userId: string,
 ): Promise<boolean> {
-  const m = await db.conversationMember.findUnique({
-    where: { conversationId_userId: { conversationId, userId } },
-    select: { id: true },
-  });
-  return !!m;
+  return (await memberState(conversationId, userId)) !== null;
 }
 
 /**
- * Найти существующий DM двух пользователей или создать новый.
- * DM — не группа, ровно 2 участника.
+ * Найти существующий DM двух пользователей или создать новый как ЗАПРОС.
+ * initiator — accepted, target — pending (пока не примет, общаться нельзя).
  */
 export async function findOrCreateDM(
-  a: string,
-  b: string,
+  initiator: string,
+  target: string,
 ): Promise<string> {
-  // Кандидаты: непgroup-диалоги, где есть оба.
   const existing = await db.conversation.findFirst({
     where: {
       isGroup: false,
       AND: [
-        { members: { some: { userId: a } } },
-        { members: { some: { userId: b } } },
+        { members: { some: { userId: initiator } } },
+        { members: { some: { userId: target } } },
       ],
     },
     select: { id: true },
@@ -39,7 +46,12 @@ export async function findOrCreateDM(
   const convo = await db.conversation.create({
     data: {
       isGroup: false,
-      members: { create: [{ userId: a }, { userId: b }] },
+      members: {
+        create: [
+          { userId: initiator, state: "accepted" },
+          { userId: target, state: "pending" },
+        ],
+      },
     },
     select: { id: true },
   });

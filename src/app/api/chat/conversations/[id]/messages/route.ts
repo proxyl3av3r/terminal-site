@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { rateLimit, clientIp } from "@/lib/ratelimit";
-import { isMember, MAX_TEXT, MAX_ASCII } from "@/lib/chat";
+import { isMember, memberState, MAX_TEXT, MAX_ASCII } from "@/lib/chat";
 
 export const runtime = "nodejs";
 
@@ -52,8 +52,14 @@ export async function POST(
 ) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ ok: false }, { status: 401 });
-  if (!(await isMember(params.id, session.user.id))) {
-    return NextResponse.json({ ok: false }, { status: 403 });
+  // Писать можно только в принятый диалог (получатель запроса — после accept).
+  const state = await memberState(params.id, session.user.id);
+  if (state === null) return NextResponse.json({ ok: false }, { status: 403 });
+  if (state !== "accepted") {
+    return NextResponse.json(
+      { ok: false, error: "accept the request first" },
+      { status: 403 },
+    );
   }
 
   const rl = rateLimit(`msg:${session.user.id}`, 60, 60 * 1000); // 60/мин

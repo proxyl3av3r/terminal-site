@@ -13,7 +13,7 @@ export async function GET() {
   const me = session.user.id;
 
   const members = await db.conversationMember.findMany({
-    where: { userId: me },
+    where: { userId: me, state: "accepted" },
     select: { conversationId: true, lastReadAt: true },
   });
 
@@ -27,5 +27,10 @@ export async function GET() {
     if (latest && (!m.lastReadAt || latest.createdAt > m.lastReadAt)) count++;
   }
 
-  return NextResponse.json({ ok: true, count });
+  // Входящие запросы тоже подсвечиваем в бейдже.
+  const requests = await db.conversationMember.count({
+    where: { userId: me, state: "pending" },
+  });
+
+  return NextResponse.json({ ok: true, count, requests, total: count + requests });
 }

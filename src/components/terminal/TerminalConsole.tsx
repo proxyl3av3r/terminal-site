@@ -98,10 +98,13 @@ export default function TerminalConsole({
 
   async function submit(raw: string) {
     const input = raw.trim();
+    // Пустой ввод игнорируем полностью. Это и UX (Enter на пустом поле — no-op),
+    // и фикс бага: Enter из публичного CLI, открывший консоль, больше не
+    // «проскакивает» пустым email в шаг пароля.
+    if (!input) return;
     // Эхо ввода (пароль маскируем).
     push(`${prompt} ${masked ? "•".repeat(Math.min(input.length, 12)) : input}`, "in");
     setValue("");
-    if (!input && !flow) return;
 
     if (flow) return advanceFlow(input);
 

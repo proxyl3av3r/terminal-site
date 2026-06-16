@@ -13,7 +13,8 @@ export async function GET() {
   const me = session.user.id;
 
   const rows = await db.conversation.findMany({
-    where: { members: { some: { userId: me } } },
+    // только принятые мной диалоги (входящие запросы — в /api/chat/requests)
+    where: { members: { some: { userId: me, state: "accepted" } } },
     select: {
       id: true,
       isGroup: true,

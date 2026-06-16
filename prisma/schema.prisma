@@ -77,6 +77,8 @@ model ConversationMember {
   conversationId String
   userId         String
   role           String    @default("member") // owner | member
+  // accepted — обычный участник; pending — входящий запрос (ещё не принят).
+  state          String    @default("accepted")
   joinedAt       DateTime  @default(now())
   lastReadAt     DateTime?
 

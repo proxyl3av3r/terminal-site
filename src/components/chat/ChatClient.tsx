@@ -24,6 +24,13 @@ interface Message {
   senderId: string;
   sender: PublicUser;
 }
+interface ChatRequest {
+  id: string;
+  isGroup: boolean;
+  name: string | null;
+  from: PublicUser[];
+  last: { body: string; kind: string; createdAt: string } | null;
+}
 
 const seedOf = (u: PublicUser) => u.shortId ?? u.username ?? "anon";
 const fmtTime = (iso: string) =>
@@ -43,6 +50,8 @@ export default function ChatClient({
   meUsername: string;
 }) {
   const [convos, setConvos] = useState<Conversation[]>([]);
+  const [requests, setRequests] = useState<ChatRequest[]>([]);
+  const [tab, setTab] = useState<"chats" | "requests">("chats");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
@@ -55,18 +64,43 @@ export default function ChatClient({
     if (data.ok) setConvos(data.conversations);
   }, []);
 
+  const loadRequests = useCallback(async () => {
+    const res = await fetch("/api/chat/requests");
+    const data = await res.json();
+    if (data.ok) setRequests(data.requests);
+  }, []);
+
+  async function respond(id: string, action: "accept" | "decline") {
+    const res = await fetch(`/api/chat/requests/${id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    const data = await res.json();
+    if (!data.ok) return;
+    await Promise.all([loadRequests(), loadConvos()]);
+    if (action === "accept") {
+      setTab("chats");
+      setActiveId(id);
+    }
+  }
+
   const loadMessages = useCallback(async (id: string) => {
     const res = await fetch(`/api/chat/conversations/${id}/messages`);
     const data = await res.json();
     if (data.ok) setMessages(data.messages);
   }, []);
 
-  // Поллинг списка диалогов.
+  // Поллинг списка диалогов и входящих запросов.
   useEffect(() => {
-    loadConvos();
-    const i = setInterval(loadConvos, 6000);
+    const tick = () => {
+      loadConvos();
+      loadRequests();
+    };
+    tick();
+    const i = setInterval(tick, 6000);
     return () => clearInterval(i);
-  }, [loadConvos]);
+  }, [loadConvos, loadRequests]);
 
   // Поллинг сообщений активного диалога.
   useEffect(() => {
@@ -98,40 +132,98 @@ export default function ChatClient({
 
   return (
     <div className="flex h-[calc(100vh-8rem)] overflow-hidden rounded-lg border border-white/10 bg-bg-soft/40">
-      {/* ── список диалогов ── */}
+      {/* ── список диалогов / запросов ── */}
       <div className="flex w-64 shrink-0 flex-col border-r border-white/10">
-        <div className="flex items-center justify-between border-b border-white/10 px-3 py-2.5">
-          <span className="font-mono text-sm text-fg">chats</span>
+        <div className="flex items-center gap-1 border-b border-white/10 px-2 py-2">
+          <button
+            onClick={() => setTab("chats")}
+            className={`rounded px-2 py-1 font-mono text-xs ${tab === "chats" ? "bg-accent/15 text-accent" : "text-fg-dim hover:text-fg"}`}
+          >
+            chats
+          </button>
+          <button
+            onClick={() => setTab("requests")}
+            className={`flex items-center gap-1 rounded px-2 py-1 font-mono text-xs ${tab === "requests" ? "bg-accent/15 text-accent" : "text-fg-dim hover:text-fg"}`}
+          >
+            requests
+            {requests.length > 0 && (
+              <span className="rounded-full bg-accent-amber px-1.5 text-[10px] font-bold text-bg">
+                {requests.length}
+              </span>
+            )}
+          </button>
           <button
             onClick={() => setShowNew(true)}
-            className="rounded border border-white/15 px-2 py-0.5 font-mono text-xs text-fg-dim hover:text-accent"
+            className="ml-auto rounded border border-white/15 px-2 py-0.5 font-mono text-xs text-fg-dim hover:text-accent"
           >
             + new
           </button>
         </div>
+
         <div className="flex-1 overflow-y-auto">
-          {convos.length === 0 && (
-            <p className="p-3 text-xs text-fg-dim">no chats yet. press + new</p>
-          )}
-          {convos.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setActiveId(c.id)}
-              className={`flex w-full items-center gap-2 px-3 py-2 text-left transition-colors ${
-                activeId === c.id ? "bg-accent/10" : "hover:bg-white/5"
-              }`}
-            >
-              {!c.isGroup && c.members[0] && (
-                <Avatar config={parseAvatar(c.members[0].avatar, seedOf(c.members[0]))} size={32} />
+          {tab === "chats" ? (
+            <>
+              {convos.length === 0 && (
+                <p className="p-3 text-xs text-fg-dim">no chats yet. press + new</p>
               )}
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-mono text-sm text-fg">{titleOf(c)}</div>
-                <div className="truncate text-xs text-fg-dim">
-                  {c.last ? (c.last.kind === "ascii" ? "[ascii image]" : c.last.body) : "—"}
+              {convos.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setActiveId(c.id)}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-left transition-colors ${
+                    activeId === c.id ? "bg-accent/10" : "hover:bg-white/5"
+                  }`}
+                >
+                  {!c.isGroup && c.members[0] && (
+                    <Avatar config={parseAvatar(c.members[0].avatar, seedOf(c.members[0]))} size={32} />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-mono text-sm text-fg">{titleOf(c)}</div>
+                    <div className="truncate text-xs text-fg-dim">
+                      {c.last ? (c.last.kind === "ascii" ? "[ascii image]" : c.last.body) : "—"}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </>
+          ) : (
+            <>
+              {requests.length === 0 && (
+                <p className="p-3 text-xs text-fg-dim">no incoming requests</p>
+              )}
+              {requests.map((r) => (
+                <div key={r.id} className="border-b border-white/5 px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    {r.from[0] && (
+                      <Avatar config={parseAvatar(r.from[0].avatar, seedOf(r.from[0]))} size={32} />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-mono text-sm text-fg">
+                        @{r.from[0]?.username ?? "user"}
+                      </div>
+                      <div className="truncate text-xs text-fg-dim">
+                        {r.last ? (r.last.kind === "ascii" ? "[ascii image]" : r.last.body) : "wants to chat"}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={() => respond(r.id, "accept")}
+                      className="flex-1 rounded bg-accent py-1 font-mono text-xs text-bg"
+                    >
+                      accept
+                    </button>
+                    <button
+                      onClick={() => respond(r.id, "decline")}
+                      className="flex-1 rounded border border-danger/40 py-1 font-mono text-xs text-danger hover:bg-danger/10"
+                    >
+                      decline
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </button>
-          ))}
+              ))}
+            </>
+          )}
         </div>
       </div>
 

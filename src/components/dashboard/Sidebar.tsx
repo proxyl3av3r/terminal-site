@@ -37,7 +37,7 @@ export default function Sidebar({
       try {
         const res = await fetch("/api/chat/unread");
         const data = await res.json();
-        if (alive && data.ok) setUnread(data.count);
+        if (alive && data.ok) setUnread(data.total ?? data.count ?? 0);
       } catch {
         /* ignore */
       }
