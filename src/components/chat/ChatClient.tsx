@@ -57,8 +57,9 @@ export default function ChatClient({
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const [showNew, setShowNew] = useState(false);
-  const endRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const atBottomRef = useRef(true); // юзер сейчас внизу переписки?
 
   const loadConvos = useCallback(async () => {
     const res = await fetch("/api/chat/conversations");
@@ -90,7 +91,19 @@ export default function ChatClient({
   const loadMessages = useCallback(async (id: string) => {
     const res = await fetch(`/api/chat/conversations/${id}/messages`);
     const data = await res.json();
-    if (data.ok) setMessages(data.messages);
+    if (!data.ok) return;
+    // Не пересоздаём массив, если ничего не изменилось — иначе лишний ре-рендер
+    // и ненужная прокрутка во время набора текста.
+    setMessages((prev) => {
+      const next: Message[] = data.messages;
+      if (
+        prev.length === next.length &&
+        prev[prev.length - 1]?.id === next[next.length - 1]?.id
+      ) {
+        return prev;
+      }
+      return next;
+    });
   }, []);
 
   // Поллинг списка диалогов и входящих запросов.
@@ -104,20 +117,24 @@ export default function ChatClient({
     return () => clearInterval(i);
   }, [loadConvos, loadRequests]);
 
-  // Поллинг сообщений активного диалога.
+  // Поллинг сообщений активного диалога. При смене диалога — прыгаем вниз.
   useEffect(() => {
     if (!activeId) return;
+    atBottomRef.current = true;
     loadMessages(activeId);
     const i = setInterval(() => loadMessages(activeId), 3000);
     return () => clearInterval(i);
   }, [activeId, loadMessages]);
 
+  // Прокрутка вниз ТОЛЬКО если юзер уже был внизу (не таскаем при чтении вверху).
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
+    const el = listRef.current;
+    if (el && atBottomRef.current) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   async function sendBody(kind: "text" | "ascii", body: string) {
     if (!activeId) return;
+    atBottomRef.current = true; // своё сообщение — всегда к низу
     const res = await fetch(`/api/chat/conversations/${activeId}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -269,7 +286,15 @@ export default function ChatClient({
               )}
             </div>
 
-            <div className="flex-1 space-y-1 overflow-y-auto px-4 py-3">
+            <div
+              ref={listRef}
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                atBottomRef.current =
+                  el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+              }}
+              className="flex-1 space-y-1 overflow-y-auto px-4 py-3"
+            >
               {messages.map((m, i) => {
                 const mine = m.senderId === meId;
                 // Начало «группы» — когда отправитель сменился (или прошло >5 мин).
@@ -312,7 +337,6 @@ export default function ChatClient({
                   </div>
                 );
               })}
-              <div ref={endRef} />
             </div>
 
             <form
