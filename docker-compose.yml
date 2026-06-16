@@ -51,12 +51,32 @@ services:
       SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
       SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
       SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI}
+      # Куда app шлёт события для рассылки (внутри docker-сети).
+      REALTIME_INTERNAL_URL: http://realtime:4000
+      REALTIME_SECRET: ${REALTIME_SECRET}
     depends_on:
       migrate:
         condition: service_completed_successfully
     ports:
       # Слушаем только localhost VPS — наружу выставляет Nginx (HTTPS).
       - "127.0.0.1:3000:3000"
+
+  # WebSocket-сервис (Socket.IO): онлайн-статус, «печатает…», мгновенная
+  # доставка. Тонкий — без Next/Prisma; БД читает только для проверки членства.
+  realtime:
+    build:
+      context: ./realtime
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      AUTH_SECRET: ${AUTH_SECRET}
+      REALTIME_SECRET: ${REALTIME_SECRET}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      # Наружу выставляет Nginx (location /socket.io/ → 4000).
+      - "127.0.0.1:4000:4000"
 
 volumes:
   pgdata:

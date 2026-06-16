@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Avatar from "@/components/avatar/Avatar";
 import { parseAvatar } from "@/lib/avatar";
 import { imageToAscii } from "@/lib/ascii";
+import { getChatSocket } from "@/lib/socket";
 
 interface PublicUser {
   username: string | null;
@@ -61,6 +62,14 @@ export default function ChatClient({
   const listRef = useRef<HTMLDivElement>(null);
   const atBottomRef = useRef(true); // юзер сейчас внизу переписки?
 
+  // Realtime: presence (кто онлайн в активной комнате) и «typing…» собеседника.
+  const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
+  const [peerTyping, setPeerTyping] = useState(false);
+  const activeIdRef = useRef<string | null>(null); // для замыканий в обработчиках сокета
+  const typingSentRef = useRef(0); // когда последний раз слали typing:true
+  const typingStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const peerTypingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const loadConvos = useCallback(async () => {
     const res = await fetch("/api/chat/conversations");
     const data = await res.json();
@@ -106,24 +115,106 @@ export default function ChatClient({
     });
   }, []);
 
-  // Поллинг списка диалогов и входящих запросов.
+  // Список диалогов и запросов: мгновенно — через сокет (ниже), а это —
+  // первичная загрузка + редкий страховочный fallback (было 6с).
   useEffect(() => {
-    const tick = () => {
+    loadConvos();
+    loadRequests();
+    const i = setInterval(() => {
       loadConvos();
       loadRequests();
-    };
-    tick();
-    const i = setInterval(tick, 6000);
+    }, 20000);
     return () => clearInterval(i);
   }, [loadConvos, loadRequests]);
 
-  // Поллинг сообщений активного диалога. При смене диалога — прыгаем вниз.
+  // ── Realtime: подписка на события сокета (один раз) ──
   useEffect(() => {
+    const socket = getChatSocket();
+
+    // Новое сообщение в открытой переписке → перечитать (заодно отметит read).
+    const onMessage = (p: { conversationId?: string }) => {
+      if (p?.conversationId && p.conversationId === activeIdRef.current) {
+        loadMessages(p.conversationId);
+      }
+    };
+    const onBump = () => loadConvos();
+    const onRequest = () => loadRequests();
+    const onRemoved = (p: { conversationId?: string }) => {
+      if (p?.conversationId && p.conversationId === activeIdRef.current) {
+        setActiveId(null);
+      }
+      loadConvos();
+      loadRequests();
+    };
+    const onPresence = (p: { conversationId?: string; userId?: string; online?: boolean }) => {
+      if (!p?.userId || p.conversationId !== activeIdRef.current) return;
+      setOnlineIds((prev) => {
+        const next = new Set(prev);
+        if (p.online) next.add(p.userId!);
+        else next.delete(p.userId!);
+        return next;
+      });
+    };
+    const onTyping = (p: { conversationId?: string; userId?: string; typing?: boolean }) => {
+      if (p?.conversationId !== activeIdRef.current || p.userId === meId) return;
+      setPeerTyping(!!p.typing);
+      if (peerTypingTimer.current) clearTimeout(peerTypingTimer.current);
+      if (p.typing) {
+        // авто-сброс на случай потери события «перестал печатать»
+        peerTypingTimer.current = setTimeout(() => setPeerTyping(false), 5000);
+      }
+    };
+    // На (ре)коннект — заново войти в комнату активной переписки.
+    const onConnect = () => {
+      const id = activeIdRef.current;
+      if (!id) return;
+      socket.emit("conv:join", { conversationId: id }, (ack?: { ok?: boolean; online?: string[] }) => {
+        if (ack?.ok && Array.isArray(ack.online)) setOnlineIds(new Set(ack.online));
+      });
+    };
+
+    socket.on("message", onMessage);
+    socket.on("conversation:bump", onBump);
+    socket.on("request:new", onRequest);
+    socket.on("conversation:removed", onRemoved);
+    socket.on("presence", onPresence);
+    socket.on("typing", onTyping);
+    socket.on("connect", onConnect);
+    return () => {
+      socket.off("message", onMessage);
+      socket.off("conversation:bump", onBump);
+      socket.off("request:new", onRequest);
+      socket.off("conversation:removed", onRemoved);
+      socket.off("presence", onPresence);
+      socket.off("typing", onTyping);
+      socket.off("connect", onConnect);
+    };
+  }, [loadConvos, loadRequests, loadMessages, meId]);
+
+  // Смена активной переписки: вход/выход из комнаты, presence/typing, fallback.
+  useEffect(() => {
+    activeIdRef.current = activeId;
+    setPeerTyping(false);
+    setOnlineIds(new Set());
     if (!activeId) return;
     atBottomRef.current = true;
     loadMessages(activeId);
-    const i = setInterval(() => loadMessages(activeId), 3000);
-    return () => clearInterval(i);
+
+    const socket = getChatSocket();
+    socket.emit(
+      "conv:join",
+      { conversationId: activeId },
+      (ack?: { ok?: boolean; online?: string[] }) => {
+        if (ack?.ok && Array.isArray(ack.online)) setOnlineIds(new Set(ack.online));
+      },
+    );
+
+    // Страховочный fallback (было 3с) — на случай простоя realtime.
+    const i = setInterval(() => loadMessages(activeId), 25000);
+    return () => {
+      clearInterval(i);
+      socket.emit("conv:leave", { conversationId: activeId });
+    };
   }, [activeId, loadMessages]);
 
   // Прокрутка вниз ТОЛЬКО если юзер уже был внизу (не таскаем при чтении вверху).
@@ -132,8 +223,35 @@ export default function ChatClient({
     if (el && atBottomRef.current) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
+  // Сообщить собеседнику, что печатаю (не чаще раза в ~1.5с) + авто-стоп.
+  function emitTyping() {
+    const cid = activeIdRef.current;
+    if (!cid) return;
+    const socket = getChatSocket();
+    const now = Date.now();
+    if (now - typingSentRef.current > 1500) {
+      typingSentRef.current = now;
+      socket.emit("typing", { conversationId: cid, typing: true });
+    }
+    if (typingStopRef.current) clearTimeout(typingStopRef.current);
+    typingStopRef.current = setTimeout(() => {
+      typingSentRef.current = 0;
+      socket.emit("typing", { conversationId: cid, typing: false });
+    }, 2500);
+  }
+
+  function stopTyping() {
+    const cid = activeIdRef.current;
+    if (typingStopRef.current) clearTimeout(typingStopRef.current);
+    if (typingSentRef.current && cid) {
+      getChatSocket().emit("typing", { conversationId: cid, typing: false });
+    }
+    typingSentRef.current = 0;
+  }
+
   async function sendBody(kind: "text" | "ascii", body: string) {
     if (!activeId) return;
+    stopTyping();
     atBottomRef.current = true; // своё сообщение — всегда к низу
     const res = await fetch(`/api/chat/conversations/${activeId}/messages`, {
       method: "POST",
@@ -164,6 +282,8 @@ export default function ChatClient({
   }
 
   const active = convos.find((c) => c.id === activeId);
+  // onlineIds включает меня (я в комнате) — для статуса собеседника исключаем.
+  const othersOnline = [...onlineIds].filter((id) => id !== meId);
 
   return (
     <div className="flex h-[calc(100dvh-10rem)] overflow-hidden rounded-lg border border-white/10 bg-bg-soft/40 md:h-[calc(100vh-8rem)]">
@@ -278,10 +398,22 @@ export default function ChatClient({
               >
                 ‹
               </button>
-              {titleOf(active)}
+              <span>{titleOf(active)}</span>
+              {!active.isGroup && othersOnline.length > 0 && (
+                <span className="flex items-center gap-1 text-[11px] text-accent">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent" />
+                  online
+                </span>
+              )}
               {active.isGroup && (
                 <span className="ml-2 text-xs text-fg-dim">
                   {active.members.length + 1} members
+                  {othersOnline.length > 0 && ` · ${othersOnline.length} online`}
+                </span>
+              )}
+              {peerTyping && (
+                <span className="ml-auto animate-pulse text-[11px] text-fg-dim">
+                  typing…
                 </span>
               )}
             </div>
@@ -365,7 +497,10 @@ export default function ChatClient({
               />
               <input
                 value={text}
-                onChange={(e) => setText(e.target.value)}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  emitTyping();
+                }}
                 placeholder="message…"
                 maxLength={2000}
                 className="flex-1 bg-transparent text-sm text-fg caret-accent outline-none"

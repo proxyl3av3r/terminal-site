@@ -110,13 +110,20 @@ nano .env
 - `AUTH_SECRET` — новый `openssl rand -hex 32`.
 - `AUTH_URL="https://твой-домен"`.
 - `GMAIL_*`, `SITE_NAME`.
+- `REALTIME_SECRET` — новый `openssl rand -hex 32` (общий секрет app↔realtime).
 
 ### 5.3. Запуск
 ```bash
 docker compose up -d --build
 ```
 Что произойдёт: поднимется Postgres → сервис `migrate` применит миграции →
-стартует `app` на `127.0.0.1:3000` (наружу не торчит).
+стартуют `app` на `127.0.0.1:3000` и `realtime` (Socket.IO) на `127.0.0.1:4000`
+(оба наружу не торчат — выставляет Nginx).
+
+> **Realtime-чат:** Nginx должен проксировать `location /socket.io/` на `:4000`
+> (см. обновлённый `deploy/nginx.conf.example`). Этот блок идёт ДО `location /`.
+> После правки nginx-конфига: `sudo nginx -t && sudo systemctl reload nginx`.
+> Проверка: `docker compose logs -f realtime` и `curl -s localhost:4000/health`.
 
 Проверка: `docker compose ps`, логи — `docker compose logs -f app`.
 

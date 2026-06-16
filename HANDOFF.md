@@ -34,7 +34,8 @@ cd ~/terminal-site && git pull && docker compose up -d --build
 ## Env-переменные (.env на VPS)
 `POSTGRES_USER/PASSWORD/DB`, `DATABASE_URL` (host=`db`), `AUTH_SECRET`, `AUTH_URL=https://klebold.xyz`,
 `SMTP_HOST/PORT/USER/PASS`, `EMAIL_FROM`, `SITE_NAME`, `TOKEN_ENC_KEY` (AES для Spotify-токенов),
-`SPOTIFY_CLIENT_ID/SECRET/REDIRECT_URI`.
+`SPOTIFY_CLIENT_ID/SECRET/REDIRECT_URI`, `REALTIME_SECRET` (общий секрет app↔realtime, `openssl rand -hex 32`).
+App также получает `REALTIME_INTERNAL_URL` (= `http://realtime:4000`, задаётся в docker-compose).
 
 ---
 
@@ -66,7 +67,10 @@ sound/matrix/login/...`), easter eggs (`sudo`, Konami-код), темы (green/a
 - Сообщения: text + **ASCII-картинки** (кнопка `▤`, конверт в браузере, хранится текстом).
 - Бейдж непрочитанных (+ запросы) на пункте chat.
 - Поиск по `@нику`/`#id`/email (без утечки чужой почты).
-- Сейчас на **поллинге** (диалоги 6с, сообщения 3с). Умная авто-прокрутка (только если внизу).
+- **Realtime (Socket.IO):** мгновенная доставка, **онлайн-статус** (зелёная точка/`N online`),
+  **«typing…»**. Отдельный контейнер `realtime` (см. ниже). Поллинг остался редким
+  страховочным fallback (диалоги 20с, активная переписка 25с, бейдж 30с). Умная
+  авто-прокрутка (только если внизу).
 
 **Мобильная адаптация:** десктоп — сайдбар; мобила — верхняя плашка + нижний таб-бар; чат
 одно-панельный с «назад»; viewport/theme-color; iOS-zoom фикс (поля 16px на мобиле); safe-area.
@@ -79,8 +83,14 @@ sound/matrix/login/...`), easter eggs (`sudo`, Konami-код), темы (green/a
 ## Ключевые решения и подводные камни
 - **JWT-сессии** (не БД): credentials-провайдер Auth.js не умеет DB-сессии. Таблицы `Session`/`Account`
   в схеме есть, но не используются.
-- **Realtime для чата/игры — РЕШЕНО: свой WebSocket (Socket.IO) на VPS, отдельным контейнером за
-  Nginx** (Upgrade-заголовки в nginx уже есть). НЕ реализовано. Swap добавлен под запас памяти.
+- **Realtime для чата — РЕАЛИЗОВАНО:** свой WebSocket (Socket.IO) отдельным контейнером `realtime`
+  за Nginx (`location /socket.io/` → `:4000`, идёт ДО `location /`). Архитектура: REST остаётся
+  источником истины (запись/валидация/rate-limit в Next-ручках), после записи app дёргает внутренний
+  `POST /emit` realtime-сервиса (по `REALTIME_SECRET`), тот рассылает по комнатам. Комнаты:
+  `user:<id>` (список/бейджи/запросы) и `conv:<id>` (сообщения/typing/presence). Аутентификация
+  сокета — декод next-auth JWT из cookie (`@auth/core/jwt`, salt = имя cookie). Сервис тонкий: без
+  Next/Prisma, `pg` только для проверки членства при входе в комнату. Presence «scoped» к открытым
+  диалогам (privacy). **Игра (Фаза 4)** переиспользует этот же сервис. Swap добавлен под запас памяти.
 - **ASCII-картинки** хранятся текстом (никакого бинаря на сервере). Лимиты: text 2000, ascii 12000.
 - **next.config** — только `.mjs` (на Next 14 `.ts` не поддерживается). argon2 в
   `experimental.serverComponentsExternalPackages`.
@@ -95,13 +105,14 @@ sound/matrix/login/...`), easter eggs (`sudo`, Konami-код), темы (green/a
 ---
 
 ## Роадмап (что дальше)
-1. **3c — WebSocket realtime** (следующее): заменить поллинг на Socket.IO, «печатает…», онлайн-статус.
-   Отдельный Node-сервис в docker-compose, аутентификация по next-auth JWT из cookie, Nginx route
-   `/socket.io/`.
+1. ✅ ~~**3c — WebSocket realtime**~~ — СДЕЛАНО (Socket.IO, контейнер `realtime`, typing, онлайн-статус,
+   мгновенная доставка). Деплой: добавить `REALTIME_SECRET` в `.env` на VPS + обновить nginx-конфиг
+   (`location /socket.io/`). Подробности — в «Ключевых решениях».
 2. **Стикеры** — набор готовых ASCII-артов (эмодзи уже работают как юникод-текст).
 3. **UI создания групп** в чате (API уже умеет `isGroup`, UI делает пока только DM).
 4. **Фаза 4 — игра рисовалка-угадайка:** комнаты по ссылке/id, холст с цветами, чат сбоку, логика
-   слова, подсказки «горячо/холодно». Realtime.
+   слова, подсказки «горячо/холодно». Realtime — переиспользовать сервис `realtime/` (добавить
+   game-namespace/события, источник истины — также Next-ручки или сам сервис).
 5. **Фаза 5 — очки и разблокировки:** победы дают `points` → открывают locked-опции аватара
    (в `lib/avatar.ts` у опций есть `cost`).
 6. **Серверный харденинг (осталось):** SSH только по ключу (добавить ключ Windows-машины перед
@@ -112,7 +123,9 @@ sound/matrix/login/...`), easter eggs (`sudo`, Konami-код), темы (green/a
 src/app/            — страницы (home, dashboard/*, api/*)
 src/components/      — home/, terminal/, chat/, dashboard/, avatar/, canvas/
 src/lib/            — auth, db, email, tokens, 2fa, ratelimit, crypto, spotify,
-                      profile, avatar, chat, ascii
+                      profile, avatar, chat, ascii, realtime (server→socket),
+                      socket (client singleton socket.io-client)
+realtime/           — отдельный Socket.IO-сервис (server.mjs, Dockerfile) — свой контейнер
 prisma/             — schema.prisma + migrations/
 Dockerfile, docker-compose.yml, deploy/nginx.conf.example, DEPLOY.md
 ```

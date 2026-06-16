@@ -26,11 +26,12 @@ export async function isMember(
 /**
  * Найти существующий DM двух пользователей или создать новый как ЗАПРОС.
  * initiator — accepted, target — pending (пока не примет, общаться нельзя).
+ * `created` = true, если диалог только что создан (тогда target получит запрос).
  */
 export async function findOrCreateDM(
   initiator: string,
   target: string,
-): Promise<string> {
+): Promise<{ id: string; created: boolean }> {
   const existing = await db.conversation.findFirst({
     where: {
       isGroup: false,
@@ -41,7 +42,7 @@ export async function findOrCreateDM(
     },
     select: { id: true },
   });
-  if (existing) return existing.id;
+  if (existing) return { id: existing.id, created: false };
 
   const convo = await db.conversation.create({
     data: {
@@ -55,5 +56,5 @@ export async function findOrCreateDM(
     },
     select: { id: true },
   });
-  return convo.id;
+  return { id: convo.id, created: true };
 }

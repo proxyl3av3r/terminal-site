@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { findOrCreateDM } from "@/lib/chat";
+import { notifyRealtime, userRoom } from "@/lib/realtime";
 
 export const runtime = "nodejs";
 
@@ -73,7 +74,9 @@ export async function POST(req: Request) {
     const exists = await db.user.findUnique({ where: { id: target }, select: { id: true } });
     if (!exists) return NextResponse.json({ ok: false, error: "user not found" }, { status: 404 });
 
-    const id = await findOrCreateDM(me, target);
+    const { id, created } = await findOrCreateDM(me, target);
+    // Новый запрос → у получателя обновляем вкладку requests и бейдж.
+    if (created) void notifyRealtime([userRoom(target)], "request:new", { id });
     return NextResponse.json({ ok: true, id });
   }
 
@@ -98,5 +101,11 @@ export async function POST(req: Request) {
     },
     select: { id: true },
   });
+  // Участникам группы — обновить список диалогов.
+  void notifyRealtime(
+    valid.filter((u) => u.id !== me).map((u) => userRoom(u.id)),
+    "conversation:bump",
+    { conversationId: convo.id, senderId: me, last: null },
+  );
   return NextResponse.json({ ok: true, id: convo.id });
 }

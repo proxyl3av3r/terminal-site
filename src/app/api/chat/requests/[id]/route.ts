@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { memberState } from "@/lib/chat";
+import { notifyRealtime, userRoom, convRoom } from "@/lib/realtime";
 
 export const runtime = "nodejs";
 
@@ -33,12 +34,32 @@ export async function POST(
       where: { conversationId_userId: { conversationId: params.id, userId: me } },
       data: { state: "accepted" },
     });
+    // Инициатору (и прочим участникам) — обновить список: теперь можно писать.
+    const others = await db.conversationMember.findMany({
+      where: { conversationId: params.id, userId: { not: me } },
+      select: { userId: true },
+    });
+    void notifyRealtime(
+      others.map((m) => userRoom(m.userId)),
+      "conversation:bump",
+      { conversationId: params.id, senderId: me, last: null },
+    );
     return NextResponse.json({ ok: true, accepted: true });
   }
 
   if (body.action === "decline") {
+    // До удаления соберём участников, чтобы уведомить инициатора об отмене.
+    const others = await db.conversationMember.findMany({
+      where: { conversationId: params.id, userId: { not: me } },
+      select: { userId: true },
+    });
     // Отклоняем DM-запрос — удаляем диалог целиком (каскадом и сообщения).
     await db.conversation.delete({ where: { id: params.id } });
+    void notifyRealtime(
+      [...others.map((m) => userRoom(m.userId)), convRoom(params.id)],
+      "conversation:removed",
+      { conversationId: params.id },
+    );
     return NextResponse.json({ ok: true, declined: true });
   }
 

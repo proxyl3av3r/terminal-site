@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { rateLimit, clientIp } from "@/lib/ratelimit";
 import { isMember, memberState, MAX_TEXT, MAX_ASCII } from "@/lib/chat";
+import { notifyRealtime, convRoom, userRoom } from "@/lib/realtime";
 
 export const runtime = "nodejs";
 
@@ -92,6 +93,26 @@ export async function POST(
       sender: { select: { username: true, shortId: true, avatar: true } },
     },
   });
+
+  // Realtime: открытым переписям — само сообщение; всем участникам (для списка
+  // диалогов и бейджа непрочитанных) — лёгкий «bump». Источник истины — БД выше.
+  const members = await db.conversationMember.findMany({
+    where: { conversationId: params.id },
+    select: { userId: true },
+  });
+  void notifyRealtime([convRoom(params.id)], "message", {
+    conversationId: params.id,
+    message: msg,
+  });
+  void notifyRealtime(
+    members.map((m) => userRoom(m.userId)),
+    "conversation:bump",
+    {
+      conversationId: params.id,
+      senderId: session.user.id,
+      last: { body: text, kind, createdAt: msg.createdAt },
+    },
+  );
 
   return NextResponse.json({ ok: true, message: msg });
 }
