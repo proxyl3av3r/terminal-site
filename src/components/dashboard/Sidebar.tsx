@@ -1,21 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import Avatar from "@/components/avatar/Avatar";
 import type { AvatarConfig } from "@/lib/avatar";
+import { NAV } from "@/components/dashboard/nav";
+import { useUnread } from "@/components/dashboard/useUnread";
 
-// Терминальный сайдбар. Активный пункт подсвечен «> », как курсор в меню.
-const NAV = [
-  { href: "/dashboard", label: "overview", cmd: "~/" },
-  { href: "/dashboard/chat", label: "chat", cmd: "~/chat" },
-  { href: "/dashboard/avatar", label: "avatar", cmd: "~/avatar" },
-  { href: "/dashboard/ascii", label: "img2ascii", cmd: "~/ascii" },
-  { href: "/dashboard/settings", label: "settings", cmd: "~/settings" },
-];
-
+// Десктоп-сайдбар (на мобиле скрыт — там нижний бар MobileNav).
 export default function Sidebar({
   email,
   username,
@@ -28,30 +21,10 @@ export default function Sidebar({
   avatar: AvatarConfig;
 }) {
   const pathname = usePathname();
-  const [unread, setUnread] = useState(0);
-
-  // Опрос непрочитанных для бейджа на пункте chat.
-  useEffect(() => {
-    let alive = true;
-    const poll = async () => {
-      try {
-        const res = await fetch("/api/chat/unread");
-        const data = await res.json();
-        if (alive && data.ok) setUnread(data.total ?? data.count ?? 0);
-      } catch {
-        /* ignore */
-      }
-    };
-    poll();
-    const i = setInterval(poll, 10000);
-    return () => {
-      alive = false;
-      clearInterval(i);
-    };
-  }, [pathname]);
+  const unread = useUnread();
 
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-white/10 bg-bg-soft/60 p-4">
+    <aside className="hidden w-56 shrink-0 flex-col border-r border-white/10 bg-bg-soft/60 p-4 md:flex">
       <div className="mb-6 flex items-center gap-3">
         <Avatar config={avatar} size={40} />
         <div className="min-w-0">

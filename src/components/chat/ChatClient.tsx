@@ -131,9 +131,9 @@ export default function ChatClient({
   const active = convos.find((c) => c.id === activeId);
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] overflow-hidden rounded-lg border border-white/10 bg-bg-soft/40">
-      {/* ── список диалогов / запросов ── */}
-      <div className="flex w-64 shrink-0 flex-col border-r border-white/10">
+    <div className="flex h-[calc(100dvh-10rem)] overflow-hidden rounded-lg border border-white/10 bg-bg-soft/40 md:h-[calc(100vh-8rem)]">
+      {/* ── список диалогов / запросов (на мобиле прячется при открытом чате) ── */}
+      <div className={`${activeId ? "hidden md:flex" : "flex"} w-full shrink-0 flex-col border-r border-white/10 md:w-64`}>
         <div className="flex items-center gap-1 border-b border-white/10 px-2 py-2">
           <button
             onClick={() => setTab("chats")}
@@ -227,15 +227,22 @@ export default function ChatClient({
         </div>
       </div>
 
-      {/* ── окно сообщений ── */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      {/* ── окно сообщений (на мобиле занимает весь экран при открытом чате) ── */}
+      <div className={`${activeId ? "flex" : "hidden md:flex"} min-w-0 flex-1 flex-col`}>
         {!active ? (
-          <div className="grid flex-1 place-items-center text-sm text-fg-dim">
+          <div className="grid flex-1 place-items-center px-4 text-center text-sm text-fg-dim">
             select a chat or start a new one
           </div>
         ) : (
           <>
-            <div className="border-b border-white/10 px-4 py-2.5 font-mono text-sm text-fg">
+            <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2.5 font-mono text-sm text-fg md:px-4">
+              <button
+                onClick={() => setActiveId(null)}
+                aria-label="back"
+                className="text-fg-dim hover:text-fg md:hidden"
+              >
+                ‹
+              </button>
               {titleOf(active)}
               {active.isGroup && (
                 <span className="ml-2 text-xs text-fg-dim">

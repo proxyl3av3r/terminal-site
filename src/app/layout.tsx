@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -11,6 +11,13 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "klebold.xyz",
   description: "personal terminal",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0a0a0a",
+  width: "device-width",
+  initialScale: 1,
+  // не запрещаем зум — доступность
 };
 
 export default function RootLayout({

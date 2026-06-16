@@ -282,6 +282,19 @@ export default function PublicCLI({
           className="flex-1 bg-transparent text-fg caret-accent outline-none"
         />
       </div>
+
+      {/* быстрые команды-чипы — удобно тапать на мобиле, без печати */}
+      <div className="mt-3 flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
+        {["about", "projects", "skills", "social", "neofetch", "login"].map((c) => (
+          <button
+            key={c}
+            onClick={() => run(c)}
+            className="rounded border border-white/10 bg-bg-soft/60 px-2.5 py-1 text-xs text-fg-dim transition-colors hover:border-accent/40 hover:text-accent"
+          >
+            {c}
+          </button>
+        ))}
+      </div>
       <div ref={endRef} />
     </div>
   );
