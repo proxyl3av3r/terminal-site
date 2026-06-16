@@ -329,8 +329,14 @@ export default function ChatClient({
                     activeId === c.id ? "bg-accent/10" : "hover:bg-white/5"
                   }`}
                 >
-                  {!c.isGroup && c.members[0] && (
-                    <Avatar config={parseAvatar(c.members[0].avatar, seedOf(c.members[0]))} size={32} />
+                  {c.isGroup ? (
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-white/10 bg-black/40 font-mono text-xs text-accent">
+                      #
+                    </span>
+                  ) : (
+                    c.members[0] && (
+                      <Avatar config={parseAvatar(c.members[0].avatar, seedOf(c.members[0]))} size={32} />
+                    )
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-mono text-sm text-fg">{titleOf(c)}</div>
@@ -527,7 +533,9 @@ export default function ChatClient({
   );
 }
 
-// ── Поиск и старт нового диалога ──
+// ── Поиск и старт нового диалога: DM или группа ──
+type FoundUser = PublicUser & { id: string };
+
 function NewChat({
   onClose,
   onCreated,
@@ -535,9 +543,13 @@ function NewChat({
   onClose: () => void;
   onCreated: (id: string) => void;
 }) {
+  const [mode, setMode] = useState<"direct" | "group">("direct");
   const [q, setQ] = useState("");
-  const [found, setFound] = useState<(PublicUser & { id: string }) | null | "none">(null);
+  const [found, setFound] = useState<FoundUser | null | "none">(null);
   const [busy, setBusy] = useState(false);
+  // ── группа ──
+  const [groupName, setGroupName] = useState("");
+  const [members, setMembers] = useState<FoundUser[]>([]);
 
   async function lookup() {
     setFound(null);
@@ -547,6 +559,7 @@ function NewChat({
     setFound(data.user ?? "none");
   }
 
+  // DM: один target → запрос/диалог.
   async function start(targetUserId: string) {
     setBusy(true);
     const res = await fetch("/api/chat/conversations", {
@@ -559,11 +572,96 @@ function NewChat({
     if (data.ok) onCreated(data.id);
   }
 
+  // Добавить найденного в список участников группы (без дублей).
+  function addMember(u: FoundUser) {
+    setMembers((m) => (m.some((x) => x.id === u.id) ? m : [...m, u]));
+    setQ("");
+    setFound(null);
+  }
+
+  async function createGroup() {
+    const name = groupName.trim();
+    if (!name || members.length === 0) return;
+    setBusy(true);
+    const res = await fetch("/api/chat/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        isGroup: true,
+        name,
+        memberIds: members.map((m) => m.id),
+      }),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (data.ok) onCreated(data.id);
+  }
+
+  const switchMode = (m: "direct" | "group") => {
+    setMode(m);
+    setQ("");
+    setFound(null);
+  };
+
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-black/60" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className="fixed inset-0 z-40 grid place-items-center bg-black/60 p-4"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div className="w-[min(92vw,420px)] rounded-lg border border-white/10 bg-bg-soft p-5">
         <div className="mb-3 font-mono text-sm text-accent">$ new chat</div>
-        <p className="mb-2 text-xs text-fg-dim">find by @username, #123456 or email</p>
+
+        {/* переключатель режима */}
+        <div className="mb-3 flex gap-1">
+          <button
+            onClick={() => switchMode("direct")}
+            className={`rounded px-2.5 py-1 font-mono text-xs ${mode === "direct" ? "bg-accent/15 text-accent" : "text-fg-dim hover:text-fg"}`}
+          >
+            direct
+          </button>
+          <button
+            onClick={() => switchMode("group")}
+            className={`rounded px-2.5 py-1 font-mono text-xs ${mode === "group" ? "bg-accent/15 text-accent" : "text-fg-dim hover:text-fg"}`}
+          >
+            group
+          </button>
+        </div>
+
+        {mode === "group" && (
+          <input
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
+            placeholder="group name"
+            maxLength={60}
+            className="mb-3 w-full rounded border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm text-fg outline-none focus:border-accent"
+          />
+        )}
+
+        {/* выбранные участники (только для группы) */}
+        {mode === "group" && members.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {members.map((m) => (
+              <span
+                key={m.id}
+                className="flex items-center gap-1 rounded-full border border-white/10 bg-black/40 py-0.5 pl-1 pr-2 font-mono text-xs text-fg"
+              >
+                <Avatar config={parseAvatar(m.avatar, seedOf(m))} size={18} />
+                @{m.username ?? "user"}
+                <button
+                  onClick={() => setMembers((arr) => arr.filter((x) => x.id !== m.id))}
+                  aria-label={`remove @${m.username ?? "user"}`}
+                  className="ml-0.5 text-fg-dim hover:text-danger"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        <p className="mb-2 text-xs text-fg-dim">
+          {mode === "group" ? "add members by" : "find by"} @username, #123456 or email
+        </p>
         <div className="flex gap-2">
           <input
             autoFocus
@@ -581,13 +679,29 @@ function NewChat({
         {found === "none" && <p className="mt-3 text-xs text-danger">no user found</p>}
         {found && found !== "none" && (
           <button
-            onClick={() => start(found.id)}
-            disabled={busy}
+            onClick={() => (mode === "group" ? addMember(found) : start(found.id))}
+            disabled={busy || (mode === "group" && members.some((x) => x.id === found.id))}
             className="mt-3 flex w-full items-center gap-2 rounded border border-white/10 p-2 hover:border-accent/40 disabled:opacity-50"
           >
             <Avatar config={parseAvatar(found.avatar, seedOf(found))} size={32} />
             <span className="font-mono text-sm text-fg">@{found.username ?? "user"}</span>
-            <span className="ml-auto font-mono text-xs text-accent">start →</span>
+            <span className="ml-auto font-mono text-xs text-accent">
+              {mode === "group"
+                ? members.some((x) => x.id === found.id)
+                  ? "added"
+                  : "+ add"
+                : "start →"}
+            </span>
+          </button>
+        )}
+
+        {mode === "group" && (
+          <button
+            onClick={createGroup}
+            disabled={busy || !groupName.trim() || members.length === 0}
+            className="mt-4 w-full rounded bg-accent py-2 font-mono text-xs text-bg disabled:opacity-40"
+          >
+            create group{members.length > 0 ? ` · ${members.length + 1} members` : ""}
           </button>
         )}
       </div>
