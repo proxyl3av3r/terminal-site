@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Avatar from "@/components/avatar/Avatar";
 import { parseAvatar } from "@/lib/avatar";
+import { imageToAscii } from "@/lib/ascii";
 
 interface PublicUser {
   username: string | null;
@@ -57,6 +58,7 @@ export default function ChatClient({
   const [text, setText] = useState("");
   const [showNew, setShowNew] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const loadConvos = useCallback(async () => {
     const res = await fetch("/api/chat/conversations");
@@ -114,18 +116,34 @@ export default function ChatClient({
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages]);
 
-  async function send() {
-    const body = text.trim();
-    if (!body || !activeId) return;
-    setText("");
+  async function sendBody(kind: "text" | "ascii", body: string) {
+    if (!activeId) return;
     const res = await fetch(`/api/chat/conversations/${activeId}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "text", body }),
+      body: JSON.stringify({ kind, body }),
     });
     const data = await res.json();
     if (data.ok) setMessages((m) => [...m, data.message]);
+    else if (data.error) alert(data.error);
     loadConvos();
+  }
+
+  function send() {
+    const body = text.trim();
+    if (!body) return;
+    setText("");
+    sendBody("text", body);
+  }
+
+  // Картинка → ASCII (в браузере) → отправка как ascii-сообщение.
+  async function sendImage(file: File) {
+    try {
+      const ascii = await imageToAscii(file, 72);
+      await sendBody("ascii", ascii);
+    } catch {
+      alert("could not process the image");
+    }
   }
 
   const active = convos.find((c) => c.id === activeId);
@@ -301,7 +319,26 @@ export default function ChatClient({
               onSubmit={(e) => { e.preventDefault(); send(); }}
               className="flex items-center gap-2 border-t border-white/10 px-3 py-2.5"
             >
-              <span className="font-mono text-sm text-accent">@{meUsername}</span>
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                aria-label="attach image as ASCII"
+                className="shrink-0 font-mono text-base text-fg-dim hover:text-accent"
+                title="send image as ASCII"
+              >
+                ▤
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) sendImage(f);
+                  e.target.value = "";
+                }}
+              />
               <input
                 value={text}
                 onChange={(e) => setText(e.target.value)}
