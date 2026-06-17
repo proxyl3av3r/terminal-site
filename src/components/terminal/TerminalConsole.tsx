@@ -38,7 +38,15 @@ function initialState(cmd?: "login" | "register" | "forgot"): {
   lines: Line[];
   flow: Flow;
 } {
-  if (!cmd) return { lines: BANNER, flow: null };
+  // Меню (без предзаданной команды): явно предлагаем выбор, ничего не запускаем.
+  if (!cmd)
+    return {
+      lines: [
+        ...BANNER,
+        { text: "what do you want to do? type: login · register · forgot", tone: "ok" },
+      ],
+      flow: null,
+    };
   const prompts: Record<string, string> = {
     login: "sign in. enter email:",
     register: "register. enter email:",
@@ -80,6 +88,14 @@ export default function TerminalConsole({
 
   const push = (text: string, tone: Tone = "out") =>
     setLines((l) => [...l, { text, tone }]);
+
+  // Ctrl+C — как в настоящей консоли: отменить текущий ввод/многошаговый сценарий.
+  function cancelFlow() {
+    push(`${prompt} ^C`, "dim");
+    if (flow) push("cancelled. type a command (login · register · forgot)", "dim");
+    setFlow(null);
+    setValue("");
+  }
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -160,7 +176,8 @@ export default function TerminalConsole({
           push(data.error ?? "error", "err");
         }
       } catch {
-        push("network unavailable, try again later", "err");
+        // Письмо могло уйти — не пугаем «провалом», советуем проверить почту.
+        push("request sent. if a reset email doesn't arrive, try again.", "accent");
       } finally {
         setBusy(false);
         setFlow(null);
@@ -191,7 +208,8 @@ export default function TerminalConsole({
           push(data.error ?? "registration error", "err");
         }
       } catch {
-        push("network unavailable, try again later", "err");
+        // Письмо могло уйти, даже если ответ не дошёл — не сообщаем о «провале».
+        push("request sent. if the email doesn't arrive, check spam or try again.", "accent");
       } finally {
         setBusy(false);
         setFlow(null);
@@ -306,6 +324,14 @@ export default function TerminalConsole({
             type={masked ? "password" : "text"}
             value={value}
             onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
+              // Ctrl+C отменяет ввод; если что-то выделено — не мешаем копированию.
+              if (e.ctrlKey && !e.metaKey && (e.key === "c" || e.key === "C")) {
+                if (window.getSelection()?.toString()) return;
+                e.preventDefault();
+                cancelFlow();
+              }
+            }}
             disabled={busy}
             autoComplete={masked ? "current-password" : "off"}
             autoCapitalize="off"

@@ -20,7 +20,13 @@ type AuthCmd = "login" | "register" | "forgot";
 
 export default function HomeClient({ verified }: { verified?: string }) {
   const [booting, setBooting] = useState(true);
-  const [authCmd, setAuthCmd] = useState<AuthCmd | null>(null);
+  // Консоль открыта? + какой сценарий предзадан (undefined = меню: выбор команды).
+  const [consoleOpen, setConsoleOpen] = useState(false);
+  const [authCmd, setAuthCmd] = useState<AuthCmd | undefined>(undefined);
+  const openConsole = (cmd?: AuthCmd) => {
+    setAuthCmd(cmd);
+    setConsoleOpen(true);
+  };
   const status = verified ? VERIFY_MSG[verified] : undefined;
   const heroRef = useRef<HTMLDivElement>(null);
 
@@ -34,7 +40,7 @@ export default function HomeClient({ verified }: { verified?: string }) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "`" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
-        setAuthCmd("login");
+        openConsole(); // меню — пусть выберет login/register/forgot
       }
     };
     window.addEventListener("keydown", onKey);
@@ -89,16 +95,16 @@ export default function HomeClient({ verified }: { verified?: string }) {
             <p className={`mt-6 text-sm ${status.tone}`}>{status.text}</p>
           )}
 
-          <PublicCLI onAuth={(cmd) => setAuthCmd(cmd)} />
+          <PublicCLI onAuth={(cmd) => openConsole(cmd)} />
         </div>
       </main>
 
-      <SecretTrigger onOpen={() => setAuthCmd("login")} />
+      <SecretTrigger onOpen={() => openConsole()} />
 
-      {authCmd && (
+      {consoleOpen && (
         <TerminalConsole
           initialCommand={authCmd}
-          onClose={() => setAuthCmd(null)}
+          onClose={() => setConsoleOpen(false)}
         />
       )}
     </>

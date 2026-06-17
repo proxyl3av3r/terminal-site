@@ -23,6 +23,16 @@ function getTransporter(): nodemailer.Transporter {
     port,
     secure: port === 465, // 465 = implicit TLS, 587 = STARTTLS
     auth: { user, pass },
+    // Пул + keepAlive: переиспользуем тёплое соединение вместо нового TLS-хендшейка
+    // на каждое письмо. На нагруженной VPS холодный коннект иногда тянулся так
+    // долго, что nginx рвал ответ — и клиент видел «network», хотя письмо ушло.
+    pool: true,
+    maxConnections: 3,
+    maxMessages: 100,
+    // Жёсткие таймауты: лучше быстро упасть с честной ошибкой, чем висеть.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
   });
   return transporter;
 }
