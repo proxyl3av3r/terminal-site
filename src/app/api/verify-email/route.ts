@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { rateLimit, clientIp } from "@/lib/ratelimit";
 import { hashToken } from "@/lib/tokens";
+import { awardBadgeSafe } from "@/lib/award";
 
 export const runtime = "nodejs";
 
@@ -23,8 +24,13 @@ async function verifyEmailToken(email: string, token: string): Promise<VerifySta
     return "expired";
   }
 
-  await db.user.update({ where: { email }, data: { emailVerified: new Date() } });
+  const user = await db.user.update({
+    where: { email },
+    data: { emailVerified: new Date() },
+    select: { id: true },
+  });
   await db.verificationToken.deleteMany({ where: { identifier: email } });
+  awardBadgeSafe(user.id, "verified");
   return "success";
 }
 

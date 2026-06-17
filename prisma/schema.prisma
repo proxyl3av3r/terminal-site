@@ -51,8 +51,25 @@ model User {
   backupCodes         BackupCode[]
   conversationMembers ConversationMember[]
   messages            Message[]
+  badges              UserBadge[]
 
   @@map("users")
+}
+
+// Значки/ачивки пользователя. key — из реестра src/lib/badges.ts.
+// Ачивки начисляют points при первой выдаче; ручные (developer/first-member)
+// выдаёт супер-админ. Уникальность (userId,key) делает выдачу идемпотентной.
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  key       String
+  awardedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@index([userId])
+  @@map("user_badges")
 }
 
 // ─────────────────────────────────────────────────────────────────────

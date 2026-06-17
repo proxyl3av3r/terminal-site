@@ -114,6 +114,17 @@ sound/matrix/login/...`), easter eggs (`sudo`, Konami-код), темы (green/a
 **Мобильная адаптация:** десктоп — сайдбар; мобила — верхняя плашка + нижний таб-бар; чат
 одно-панельный с «назад»; viewport/theme-color; iOS-zoom фикс (поля 16px на мобиле); safe-area.
 
+**Баллы и значки (Фаза 1 готова):** реестр значков `src/lib/badges.ts` (чистый, client-safe) +
+выдача `src/lib/award.ts` (`awardBadgeSafe` — идемпотентно, ачивки начисляют `points`). Таблица
+`UserBadge` (миграция `20260616140000_badges`). Авто-ачивки навешаны в роутах: verify-email
+(`verified`), profile (`nickname`), avatar (`avatar`), 2fa/confirm (`two-factor`), spotify/callback
+(`spotify`), messages POST (`first-message`), conversations POST (`group-founder`). Ручные значки
+`developer` / `first-member` выдаёт админ из `/dashboard/admin` (`POST /api/admin/users/[id]/badges`).
+Показ — компонент `src/components/badges/Badges.tsx`: рядом с ником в чате (шапка DM + автор
+сообщения) и в админке; баллы+значки на дашборде. **Дальше (Фаза 2+):** daily-claim+стрик,
+лидерборд, трата баллов на разблокировку аватара (в `lib/avatar.ts` у опций уже есть `cost`),
+публичные профили, daily-загадка, реакции+фан-команды.
+
 **Супер-админ:** `src/lib/admin.ts` — `isSuperAdmin(email)` по env `SUPER_ADMIN_EMAILS` (через запятую,
 email НЕ хардкодим — репо публичное). Раздел `/dashboard/admin` (`AdminUsers.tsx`): список юзеров +
 статы (всего/verified/2fa), удаление учёток (каскадом сносит сообщения/членства/2FA; нельзя удалить

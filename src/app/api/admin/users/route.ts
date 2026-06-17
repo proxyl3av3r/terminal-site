@@ -21,6 +21,7 @@ export async function GET() {
       twoFactorEnabled: true,
       points: true,
       createdAt: true,
+      badges: { select: { key: true } },
       _count: { select: { messages: true, conversationMembers: true } },
     },
   });
@@ -34,6 +35,7 @@ export async function GET() {
     twoFactor: u.twoFactorEnabled,
     points: u.points,
     createdAt: u.createdAt,
+    badges: u.badges.map((b) => b.key),
     messages: u._count.messages,
     chats: u._count.conversationMembers,
     isAdmin: isSuperAdmin(u.email),

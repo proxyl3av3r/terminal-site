@@ -4,6 +4,7 @@ import argon2 from "argon2";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { verifyTOTP, generateBackupCodes } from "@/lib/2fa";
+import { awardBadgeSafe } from "@/lib/award";
 
 export const runtime = "nodejs";
 
@@ -56,5 +57,6 @@ export async function POST(req: Request) {
     }),
   ]);
 
+  awardBadgeSafe(user.id, "two-factor");
   return NextResponse.json({ ok: true, backupCodes: plainCodes });
 }

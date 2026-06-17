@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { rateLimit, clientIp } from "@/lib/ratelimit";
 import { isMember, getMembership, canPost, MAX_TEXT, MAX_ASCII } from "@/lib/chat";
 import { notifyRealtime, convRoom, userRoom } from "@/lib/realtime";
+import { awardBadgeSafe } from "@/lib/award";
 
 export const runtime = "nodejs";
 
@@ -33,7 +34,14 @@ export async function GET(
       body: true,
       createdAt: true,
       senderId: true,
-      sender: { select: { username: true, shortId: true, avatar: true } },
+      sender: {
+        select: {
+          username: true,
+          shortId: true,
+          avatar: true,
+          badges: { select: { key: true } },
+        },
+      },
     },
   });
 
@@ -101,7 +109,14 @@ export async function POST(
       body: true,
       createdAt: true,
       senderId: true,
-      sender: { select: { username: true, shortId: true, avatar: true } },
+      sender: {
+        select: {
+          username: true,
+          shortId: true,
+          avatar: true,
+          badges: { select: { key: true } },
+        },
+      },
     },
   });
 
@@ -125,5 +140,6 @@ export async function POST(
     },
   );
 
+  awardBadgeSafe(session.user.id, "first-message");
   return NextResponse.json({ ok: true, message: msg });
 }

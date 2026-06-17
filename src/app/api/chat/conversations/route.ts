@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { findOrCreateDM } from "@/lib/chat";
 import { notifyRealtime, userRoom } from "@/lib/realtime";
+import { awardBadgeSafe } from "@/lib/award";
 
 export const runtime = "nodejs";
 
@@ -25,7 +26,14 @@ export async function GET() {
         select: {
           userId: true,
           role: true,
-          user: { select: { username: true, shortId: true, avatar: true } },
+          user: {
+            select: {
+              username: true,
+              shortId: true,
+              avatar: true,
+              badges: { select: { key: true } },
+            },
+          },
         },
       },
       messages: {
@@ -124,5 +132,6 @@ export async function POST(req: Request) {
     "conversation:bump",
     { conversationId: convo.id, senderId: me, last: null },
   );
+  awardBadgeSafe(me, "group-founder");
   return NextResponse.json({ ok: true, id: convo.id });
 }

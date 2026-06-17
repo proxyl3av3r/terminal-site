@@ -1,9 +1,20 @@
 import Link from "next/link";
 import OnlineCount from "@/components/dashboard/OnlineCount";
 import Equalizer from "@/components/dashboard/Equalizer";
+import Badges from "@/components/badges/Badges";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
 
 // Главный экран панели — живые виджеты + ссылки на инструменты.
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const session = await auth();
+  const me = session?.user?.id
+    ? await db.user.findUnique({
+        where: { id: session.user.id },
+        select: { points: true, badges: { select: { key: true } } },
+      })
+    : null;
+
   const modules = [
     { name: "img2ascii", desc: "image → ASCII art", href: "/dashboard/ascii", soon: false },
     { name: "notes", desc: "notes / journal", href: null, soon: true },
@@ -22,6 +33,23 @@ export default function DashboardPage() {
         </div>
         <OnlineCount />
       </header>
+
+      {me && (
+        <div className="flex flex-wrap items-center gap-5 rounded-lg border border-white/10 bg-bg-soft/50 p-4">
+          <div>
+            <div className="font-mono text-2xl text-accent">{me.points}</div>
+            <div className="text-xs text-fg-dim">points</div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="mb-1 text-xs text-fg-dim">badges</div>
+            {me.badges.length > 0 ? (
+              <Badges keys={me.badges.map((b) => b.key)} size={18} />
+            ) : (
+              <span className="text-xs text-fg-dim">none yet — explore the site to earn them</span>
+            )}
+          </div>
+        </div>
+      )}
 
       <Equalizer />
 

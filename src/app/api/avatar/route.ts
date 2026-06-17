@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { rateLimit, clientIp } from "@/lib/ratelimit";
 import { parseAvatar, validateUnlocked, type AvatarConfig } from "@/lib/avatar";
+import { awardBadgeSafe } from "@/lib/award";
 
 export const runtime = "nodejs";
 
@@ -46,5 +47,6 @@ export async function POST(req: Request) {
     where: { id: session.user.id },
     data: { avatar: JSON.stringify(config) },
   });
+  awardBadgeSafe(session.user.id, "avatar");
   return NextResponse.json({ ok: true, config });
 }

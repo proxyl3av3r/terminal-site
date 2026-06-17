@@ -7,11 +7,13 @@ import { imageToAscii } from "@/lib/ascii";
 import { getChatSocket } from "@/lib/socket";
 import { canPost, canDeleteMessage } from "@/lib/roles";
 import ManagePanel from "@/components/chat/ManagePanel";
+import Badges from "@/components/badges/Badges";
 
 interface PublicUser {
   username: string | null;
   shortId: string | null;
   avatar: string | null;
+  badges?: { key: string }[];
 }
 interface Conversation {
   id: string;
@@ -442,6 +444,7 @@ export default function ChatClient({
               </button>
               {active.kind === "channel" && <span className="text-fg-dim">📡</span>}
               <span>{titleOf(active)}</span>
+              {!active.isGroup && <Badges keys={active.members[0]?.badges?.map((b) => b.key)} size={12} />}
               {!active.isGroup && othersOnline.length > 0 && (
                 <span className="flex items-center gap-1 text-[11px] text-accent">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent" />
@@ -500,10 +503,11 @@ export default function ChatClient({
                     </div>
                     <div className={`min-w-0 max-w-[75%] ${mine ? "text-right" : ""}`}>
                       {groupStart && (
-                        <div className="mb-0.5 flex items-center gap-2 font-mono text-[11px] text-fg-dim">
+                        <div className={`mb-0.5 flex items-center gap-1.5 font-mono text-[11px] text-fg-dim ${mine ? "flex-row-reverse" : ""}`}>
                           <span className={mine ? "text-accent" : "text-fg"}>
                             @{mine ? "you" : m.sender.username ?? "user"}
                           </span>
+                          <Badges keys={m.sender.badges?.map((b) => b.key)} size={11} />
                           <span>{fmtTime(m.createdAt)}</span>
                         </div>
                       )}

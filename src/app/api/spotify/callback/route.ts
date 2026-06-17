@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { exchangeCode } from "@/lib/spotify";
 import { encrypt } from "@/lib/crypto";
+import { awardBadgeSafe } from "@/lib/award";
 
 export const runtime = "nodejs";
 
@@ -34,6 +35,7 @@ export async function GET(req: Request) {
       where: { id: session.user.id },
       data: { spotifyToken: encrypt(refreshToken) },
     });
+    awardBadgeSafe(session.user.id, "spotify");
   } catch (err) {
     console.error("spotify callback failed:", err);
     return back("error");

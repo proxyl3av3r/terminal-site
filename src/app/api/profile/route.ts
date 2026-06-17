@@ -8,6 +8,7 @@ import {
   validateUsername,
   generateShortId,
 } from "@/lib/profile";
+import { awardBadgeSafe } from "@/lib/award";
 
 export const runtime = "nodejs";
 
@@ -71,5 +72,6 @@ export async function POST(req: Request) {
     select: { username: true, shortId: true },
   });
 
+  awardBadgeSafe(session.user.id, "nickname");
   return NextResponse.json({ ok: true, ...updated });
 }

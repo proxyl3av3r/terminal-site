@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Badges from "@/components/badges/Badges";
+import { MANUAL_BADGES } from "@/lib/badges";
 
 interface AdminUser {
   id: string;
@@ -11,6 +13,7 @@ interface AdminUser {
   twoFactor: boolean;
   points: number;
   createdAt: string;
+  badges: string[];
   messages: number;
   chats: number;
   isAdmin: boolean;
@@ -44,6 +47,18 @@ export default function AdminUsers() {
   useEffect(() => {
     load();
   }, [load]);
+
+  async function toggleBadge(u: AdminUser, key: string) {
+    const action = u.badges.includes(key) ? "revoke" : "grant";
+    setBusyId(u.id);
+    await fetch(`/api/admin/users/${u.id}/badges`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key, action }),
+    }).catch(() => {});
+    setBusyId(null);
+    load();
+  }
 
   async function remove(u: AdminUser) {
     if (!confirm(`delete ${u.email}? this removes their account, messages and chats. cannot be undone.`)) {
@@ -94,6 +109,7 @@ export default function AdminUsers() {
                   {u.username ? `@${u.username}` : "(no nick)"}
                 </span>
                 {u.shortId && <span className="font-mono text-[11px] text-fg-dim">#{u.shortId}</span>}
+                <Badges keys={u.badges} size={13} />
                 {u.isAdmin && (
                   <span className="rounded bg-accent/15 px-1.5 font-mono text-[10px] text-accent">admin</span>
                 )}
@@ -109,6 +125,28 @@ export default function AdminUsers() {
               <div className="truncate font-mono text-xs text-fg-dim">{u.email}</div>
               <div className="mt-0.5 font-mono text-[11px] text-fg-dim">
                 {u.messages} msg · {u.chats} chats · {u.points} pts · joined {fmtDate(u.createdAt)}
+              </div>
+              {/* выдача именных значков */}
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {MANUAL_BADGES.map((b) => {
+                  const has = u.badges.includes(b.key);
+                  return (
+                    <button
+                      key={b.key}
+                      onClick={() => toggleBadge(u, b.key)}
+                      disabled={busyId === u.id}
+                      title={b.desc}
+                      className={`rounded border px-1.5 py-0.5 font-mono text-[10px] disabled:opacity-40 ${
+                        has
+                          ? "border-accent/50 text-accent"
+                          : "border-white/15 text-fg-dim hover:text-fg"
+                      }`}
+                    >
+                      {has ? "✓ " : "+ "}
+                      {b.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
