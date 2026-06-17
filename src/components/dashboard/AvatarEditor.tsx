@@ -8,18 +8,67 @@ import {
   BGS,
   EYES,
   MOUTHS,
+  CAT_OPTIONS,
+  isUnlocked,
   type AvatarConfig,
+  type AvatarCat,
   type Option,
 } from "@/lib/avatar";
 
-export default function AvatarEditor({ initial }: { initial: AvatarConfig }) {
+export default function AvatarEditor({
+  initial,
+  points: initialPoints,
+  unlocks: initialUnlocks,
+}: {
+  initial: AvatarConfig;
+  points: number;
+  unlocks: string[];
+}) {
   const [cfg, setCfg] = useState<AvatarConfig>(initial);
+  const [points, setPoints] = useState(initialPoints);
+  const [unlocks, setUnlocks] = useState<string[]>(initialUnlocks);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
 
-  const set = (k: keyof AvatarConfig, v: number) =>
-    setCfg((c) => ({ ...c, [k]: v }));
+  const set = (k: AvatarCat, v: number) => setCfg((c) => ({ ...c, [k]: v }));
+
+  // Клик по опции: разблокированную — выбираем; платную — пытаемся купить.
+  async function choose(cat: AvatarCat, i: number) {
+    setMsg(null);
+    if (isUnlocked(cat, i, unlocks)) {
+      set(cat, i);
+      return;
+    }
+    const cost = CAT_OPTIONS[cat][i]?.cost ?? 0;
+    if (points < cost) {
+      setMsg({ text: `need ${cost} pts to unlock (you have ${points})`, ok: false });
+      return;
+    }
+    if (!confirm(`unlock this option for ${cost} pts?`)) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/avatar/unlock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cat, index: i }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setPoints(data.points);
+        setUnlocks(data.unlocks);
+        set(cat, i);
+        setMsg({ text: "unlocked ✓", ok: true });
+        router.refresh(); // обновить баланс в других местах (дашборд/шапка)
+      } else {
+        setMsg({ text: data.error ?? "could not unlock", ok: false });
+      }
+    } catch {
+      setMsg({ text: "network unavailable", ok: false });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function save() {
     setMsg(null);
@@ -51,6 +100,9 @@ export default function AvatarEditor({ initial }: { initial: AvatarConfig }) {
         <div className="rounded-xl border border-white/10 bg-bg-soft/50 p-4">
           <Avatar config={cfg} size={140} />
         </div>
+        <div className="font-mono text-xs text-fg-dim">
+          balance: <span className="text-accent-amber">{points}</span> pts
+        </div>
         <button
           onClick={save}
           disabled={busy}
@@ -59,7 +111,7 @@ export default function AvatarEditor({ initial }: { initial: AvatarConfig }) {
           {busy ? "…" : "> save avatar"}
         </button>
         {msg && (
-          <p className={`text-xs ${msg.ok ? "text-accent" : "text-danger"}`}>
+          <p className={`text-center text-xs ${msg.ok ? "text-accent" : "text-danger"}`}>
             {msg.text}
           </p>
         )}
@@ -67,44 +119,49 @@ export default function AvatarEditor({ initial }: { initial: AvatarConfig }) {
 
       {/* опции */}
       <div className="flex-1 space-y-5">
-        <Swatches label="color" options={COLORS} active={cfg.color} onPick={(i) => set("color", i)} />
-        <Swatches label="background" options={BGS} active={cfg.bg} onPick={(i) => set("bg", i)} />
-        <Picker label="eyes" options={EYES} active={cfg.eyes} onPick={(i) => set("eyes", i)} render={(i) => `eyes ${i + 1}`} />
-        <Picker label="mouth" options={MOUTHS} active={cfg.mouth} onPick={(i) => set("mouth", i)} render={(i) => `mouth ${i + 1}`} />
+        <Swatches label="color" cat="color" options={COLORS} active={cfg.color} unlocks={unlocks} points={points} onChoose={choose} />
+        <Swatches label="background" cat="bg" options={BGS} active={cfg.bg} unlocks={unlocks} points={points} onChoose={choose} />
+        <Picker label="eyes" cat="eyes" options={EYES} active={cfg.eyes} unlocks={unlocks} points={points} onChoose={choose} render={(i) => `eyes ${i + 1}`} />
+        <Picker label="mouth" cat="mouth" options={MOUTHS} active={cfg.mouth} unlocks={unlocks} points={points} onChoose={choose} render={(i) => `mouth ${i + 1}`} />
       </div>
     </div>
   );
 }
 
-function Swatches({
-  label,
-  options,
-  active,
-  onPick,
-}: {
+interface PickProps {
   label: string;
+  cat: AvatarCat;
   options: Option[];
   active: number;
-  onPick: (i: number) => void;
-}) {
+  unlocks: string[];
+  points: number;
+  onChoose: (cat: AvatarCat, i: number) => void;
+}
+
+function Swatches({ label, cat, options, active, unlocks, points, onChoose }: PickProps) {
   return (
     <div>
       <div className="mb-2 text-xs text-fg-dim">{label}</div>
       <div className="flex flex-wrap gap-2">
-        {options.map((o, i) => (
-          <button
-            key={i}
-            disabled={!o.free}
-            onClick={() => onPick(i)}
-            title={o.free ? "" : `locked · ${o.cost} pts`}
-            className={`relative h-8 w-8 rounded-md border transition-transform ${
-              active === i ? "border-accent scale-110" : "border-white/15"
-            } ${o.free ? "" : "opacity-40"}`}
-            style={{ background: o.value }}
-          >
-            {!o.free && <span className="absolute inset-0 grid place-items-center text-[10px]">🔒</span>}
-          </button>
-        ))}
+        {options.map((o, i) => {
+          const owned = isUnlocked(cat, i, unlocks);
+          const affordable = owned || points >= (o.cost ?? 0);
+          return (
+            <button
+              key={i}
+              onClick={() => onChoose(cat, i)}
+              title={owned ? "" : `locked · ${o.cost} pts`}
+              className={`relative h-8 w-8 rounded-md border transition-transform ${
+                active === i ? "scale-110 border-accent" : "border-white/15"
+              } ${owned ? "" : affordable ? "opacity-70" : "opacity-30"}`}
+              style={{ background: o.value }}
+            >
+              {!owned && (
+                <span className="absolute inset-0 grid place-items-center text-[10px]">🔒</span>
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -112,36 +169,36 @@ function Swatches({
 
 function Picker({
   label,
+  cat,
   options,
   active,
-  onPick,
+  unlocks,
+  points,
+  onChoose,
   render,
-}: {
-  label: string;
-  options: Option[];
-  active: number;
-  onPick: (i: number) => void;
-  render: (i: number) => string;
-}) {
+}: PickProps & { render: (i: number) => string }) {
   return (
     <div>
       <div className="mb-2 text-xs text-fg-dim">{label}</div>
       <div className="flex flex-wrap gap-2">
-        {options.map((o, i) => (
-          <button
-            key={i}
-            disabled={!o.free}
-            onClick={() => onPick(i)}
-            title={o.free ? "" : `locked · ${o.cost} pts`}
-            className={`rounded-md border px-3 py-1.5 font-mono text-xs transition-colors ${
-              active === i
-                ? "border-accent text-accent"
-                : "border-white/15 text-fg-dim hover:text-fg"
-            } ${o.free ? "" : "opacity-40"}`}
-          >
-            {o.free ? render(i) : `🔒 ${o.cost}`}
-          </button>
-        ))}
+        {options.map((o, i) => {
+          const owned = isUnlocked(cat, i, unlocks);
+          const affordable = owned || points >= (o.cost ?? 0);
+          return (
+            <button
+              key={i}
+              onClick={() => onChoose(cat, i)}
+              title={owned ? "" : `locked · ${o.cost} pts`}
+              className={`rounded-md border px-3 py-1.5 font-mono text-xs transition-colors ${
+                active === i
+                  ? "border-accent text-accent"
+                  : "border-white/15 text-fg-dim hover:text-fg"
+              } ${owned ? "" : affordable ? "opacity-70" : "opacity-30"}`}
+            >
+              {owned ? render(i) : `🔒 ${o.cost}`}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

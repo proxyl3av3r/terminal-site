@@ -10,7 +10,7 @@ export default async function AvatarPage() {
 
   const user = await db.user.findUnique({
     where: { id: session.user.id },
-    select: { avatar: true, points: true },
+    select: { avatar: true, points: true, unlocks: true },
   });
   const config = parseAvatar(user?.avatar ?? null, session.user.id);
 
@@ -31,7 +31,11 @@ export default async function AvatarPage() {
         </div>
       </header>
 
-      <AvatarEditor initial={config} />
+      <AvatarEditor
+        initial={config}
+        points={user?.points ?? 0}
+        unlocks={user?.unlocks ?? []}
+      />
     </div>
   );
 }

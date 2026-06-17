@@ -60,6 +60,21 @@ export default function AdminUsers() {
     load();
   }
 
+  async function grantPoints(u: AdminUser) {
+    const raw = prompt(`grant points to ${u.email} (use negative to deduct):`, "1000");
+    if (raw === null) return;
+    const amount = parseInt(raw, 10);
+    if (!Number.isFinite(amount) || amount === 0) return;
+    setBusyId(u.id);
+    await fetch(`/api/admin/users/${u.id}/points`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount }),
+    }).catch(() => {});
+    setBusyId(null);
+    load();
+  }
+
   async function remove(u: AdminUser) {
     if (!confirm(`delete ${u.email}? this removes their account, messages and chats. cannot be undone.`)) {
       return;
@@ -147,6 +162,14 @@ export default function AdminUsers() {
                     </button>
                   );
                 })}
+                <button
+                  onClick={() => grantPoints(u)}
+                  disabled={busyId === u.id}
+                  title="grant or deduct points"
+                  className="rounded border border-white/15 px-1.5 py-0.5 font-mono text-[10px] text-fg-dim hover:text-accent disabled:opacity-40"
+                >
+                  ± pts
+                </button>
               </div>
             </div>
 

@@ -25,8 +25,13 @@ model User {
   shortId       String?   @unique
   // Конфиг аватара (JSON: bg/color/eyes/mouth). null = дефолт от id.
   avatar        String?
-  // Игровые очки — за них открывается кастомизация (Фаза 5).
+  // Игровые очки — за них открывается кастомизация аватара.
   points        Int       @default(0)
+  // Ежедневный бонус: серия дней подряд + время последнего получения.
+  streak        Int       @default(0)
+  lastClaimAt   DateTime?
+  // Разблокированные платные опции аватара (ключи вида "color:4", "eyes:3").
+  unlocks       String[]  @default([])
   // Хеш пароля (argon2). null допустим теоретически (напр. OAuth), но у нас
   // всегда заполнен при регистрации через credentials.
   passwordHash  String?

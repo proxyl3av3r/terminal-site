@@ -93,15 +93,38 @@ function clamp(c: Partial<AvatarConfig>): AvatarConfig {
   };
 }
 
+// ── Разблокировки за баллы ────────────────────────────────────────────
+export type AvatarCat = "color" | "bg" | "eyes" | "mouth";
+
+export const CAT_OPTIONS: Record<AvatarCat, Option[]> = {
+  color: COLORS,
+  bg: BGS,
+  eyes: EYES,
+  mouth: MOUTHS,
+};
+
+/** Ключ опции для хранения в User.unlocks, напр. "color:4". */
+export const optionKey = (cat: AvatarCat, index: number) => `${cat}:${index}`;
+
+/** Опция доступна: либо free, либо её ключ есть в unlocks. */
+export function isUnlocked(
+  cat: AvatarCat,
+  index: number,
+  unlocks: string[],
+): boolean {
+  const o = CAT_OPTIONS[cat][index];
+  if (!o) return false;
+  return o.free || unlocks.includes(optionKey(cat, index));
+}
+
 /**
- * Проверка, что все выбранные опции РАЗБЛОКИРОВАНЫ для пользователя.
- * Сейчас разблокированы только free (очки — Фаза 5). Возвращает null если ок,
- * иначе текст ошибки.
+ * Проверка, что все выбранные опции доступны (free или разблокированы за баллы).
+ * Возвращает null если ок, иначе текст ошибки.
  */
-export function validateUnlocked(c: AvatarConfig): string | null {
-  if (!COLORS[c.color]?.free) return "this color is locked";
-  if (!BGS[c.bg]?.free) return "this background is locked";
-  if (!EYES[c.eyes]?.free) return "these eyes are locked";
-  if (!MOUTHS[c.mouth]?.free) return "this mouth is locked";
+export function validateUnlocked(c: AvatarConfig, unlocks: string[] = []): string | null {
+  if (!isUnlocked("color", c.color, unlocks)) return "this color is locked";
+  if (!isUnlocked("bg", c.bg, unlocks)) return "this background is locked";
+  if (!isUnlocked("eyes", c.eyes, unlocks)) return "these eyes are locked";
+  if (!isUnlocked("mouth", c.mouth, unlocks)) return "this mouth is locked";
   return null;
 }

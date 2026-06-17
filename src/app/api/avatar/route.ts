@@ -37,10 +37,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
   }
 
-  // Прогоняем через parseAvatar (clamp к валидным индексам), затем проверяем
-  // что выбранные опции разблокированы (сейчас — только free).
+  // Прогоняем через parseAvatar (clamp к валидным индексам), затем проверяем,
+  // что выбранные опции доступны (free или разблокированы за баллы).
   const config = parseAvatar(JSON.stringify(body), session.user.id);
-  const locked = validateUnlocked(config);
+  const me = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: { unlocks: true },
+  });
+  const locked = validateUnlocked(config, me?.unlocks ?? []);
   if (locked) return NextResponse.json({ ok: false, error: locked }, { status: 403 });
 
   await db.user.update({

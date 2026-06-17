@@ -121,9 +121,19 @@ sound/matrix/login/...`), easter eggs (`sudo`, Konami-код), темы (green/a
 (`spotify`), messages POST (`first-message`), conversations POST (`group-founder`). Ручные значки
 `developer` / `first-member` выдаёт админ из `/dashboard/admin` (`POST /api/admin/users/[id]/badges`).
 Показ — компонент `src/components/badges/Badges.tsx`: рядом с ником в чате (шапка DM + автор
-сообщения) и в админке; баллы+значки на дашборде. **Дальше (Фаза 2+):** daily-claim+стрик,
-лидерборд, трата баллов на разблокировку аватара (в `lib/avatar.ts` у опций уже есть `cost`),
-публичные профили, daily-загадка, реакции+фан-команды.
+сообщения) и в админке; баллы+значки на дашборде.
+
+**Экономика баллов (Фаза 2 готова):** миграция `20260616160000_points_economy` (`streak`,
+`lastClaimAt`, `unlocks String[]`).
+- **Daily-claim + стрик:** `POST /api/claim` (логика `src/lib/daily.ts`: 10 pts +5/день, потолок 50;
+  UTC-сутки), виджет `DailyClaim` на дашборде.
+- **Разблокировка аватара за баллы:** `POST /api/avatar/unlock` списывает `cost`, пишет ключ в
+  `User.unlocks` (`"color:4"`). `lib/avatar.ts`: `isUnlocked()/validateUnlocked(cfg, unlocks)`.
+  `AvatarEditor` — клик по locked-опции покупает её.
+- **Лидерборд:** топ-10 по `points` прямо на дашборде (`/dashboard`).
+- **Тест/модерация баллов:** `POST /api/admin/users/[id]/points {amount}` + кнопка «± pts» в админке.
+
+**Дальше (Фаза 3+):** публичные профили (`/u/<ник>`), daily-загадка, реакции+фан-команды.
 
 **Супер-админ:** `src/lib/admin.ts` — `isSuperAdmin(email)` по env `SUPER_ADMIN_EMAILS` (через запятую,
 email НЕ хардкодим — репо публичное). Раздел `/dashboard/admin` (`AdminUsers.tsx`): список юзеров +

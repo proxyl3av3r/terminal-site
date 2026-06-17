@@ -1,9 +1,13 @@
 import Link from "next/link";
 import OnlineCount from "@/components/dashboard/OnlineCount";
 import Equalizer from "@/components/dashboard/Equalizer";
+import DailyClaim from "@/components/dashboard/DailyClaim";
 import Badges from "@/components/badges/Badges";
+import Avatar from "@/components/avatar/Avatar";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { parseAvatar } from "@/lib/avatar";
+import { canClaim } from "@/lib/daily";
 
 // Главный экран панели — живые виджеты + ссылки на инструменты.
 export default async function DashboardPage() {
@@ -11,9 +15,29 @@ export default async function DashboardPage() {
   const me = session?.user?.id
     ? await db.user.findUnique({
         where: { id: session.user.id },
-        select: { points: true, badges: { select: { key: true } } },
+        select: {
+          points: true,
+          streak: true,
+          lastClaimAt: true,
+          badges: { select: { key: true } },
+        },
       })
     : null;
+
+  // Топ-10 по баллам (только публичные — с ником).
+  const top = await db.user.findMany({
+    where: { username: { not: null } },
+    orderBy: { points: "desc" },
+    take: 10,
+    select: {
+      id: true,
+      username: true,
+      shortId: true,
+      avatar: true,
+      points: true,
+      badges: { select: { key: true } },
+    },
+  });
 
   const modules = [
     { name: "img2ascii", desc: "image → ASCII art", href: "/dashboard/ascii", soon: false },
@@ -51,6 +75,8 @@ export default async function DashboardPage() {
         </div>
       )}
 
+      {me && <DailyClaim claimable={canClaim(me.lastClaimAt)} streak={me.streak} />}
+
       <Equalizer />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -81,6 +107,34 @@ export default async function DashboardPage() {
           );
         })}
       </div>
+
+      <section>
+        <h2 className="mb-2 font-mono text-sm text-fg-dim">
+          <span className="text-accent">$</span> leaderboard
+        </h2>
+        <div className="overflow-hidden rounded-lg border border-white/10 bg-bg-soft/40">
+          {top.length === 0 && <p className="p-3 text-xs text-fg-dim">no players yet</p>}
+          {top.map((u, i) => {
+            const seed = u.shortId ?? u.username ?? u.id;
+            return (
+              <div
+                key={u.id}
+                className="flex items-center gap-3 border-b border-white/5 px-3 py-2 last:border-0"
+              >
+                <span className="w-5 text-right font-mono text-xs text-fg-dim">{i + 1}</span>
+                <Avatar config={parseAvatar(u.avatar, seed)} size={28} />
+                <span className="min-w-0 flex-1 truncate font-mono text-sm text-fg">
+                  @{u.username}
+                  <span className="ml-1.5 align-middle">
+                    <Badges keys={u.badges.map((b) => b.key)} size={11} />
+                  </span>
+                </span>
+                <span className="font-mono text-sm text-accent-amber">{u.points}</span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }
