@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import Sidebar from "@/components/dashboard/Sidebar";
 import MobileNav from "@/components/dashboard/MobileNav";
 import { parseAvatar } from "@/lib/avatar";
+import { isSuperAdmin } from "@/lib/admin";
 
 // Защищённый layout. middleware уже не пускает анонимов, но дублируем проверку
 // на сервере (defense in depth) и берём профиль для сайдбара.
@@ -21,6 +22,7 @@ export default async function DashboardLayout({
     select: { email: true, username: true, shortId: true, avatar: true },
   });
   const avatarConfig = parseAvatar(user?.avatar ?? null, session.user.id);
+  const admin = isSuperAdmin(user?.email);
 
   return (
     <div className="flex min-h-screen">
@@ -29,12 +31,14 @@ export default async function DashboardLayout({
         username={user?.username ?? null}
         shortId={user?.shortId ?? null}
         avatar={avatarConfig}
+        isAdmin={admin}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <MobileNav
           username={user?.username ?? null}
           shortId={user?.shortId ?? null}
           avatar={avatarConfig}
+          isAdmin={admin}
         />
         <div className="flex-1 overflow-x-hidden p-4 pb-20 md:p-8 md:pb-8">
           {!user?.username && (

@@ -54,6 +54,8 @@ services:
       # Куда app шлёт события для рассылки (внутри docker-сети).
       REALTIME_INTERNAL_URL: http://realtime:4000
       REALTIME_SECRET: ${REALTIME_SECRET}
+      # Email'ы супер-админов (через запятую) — доступ к /dashboard/admin.
+      SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS}
     depends_on:
       migrate:
         condition: service_completed_successfully

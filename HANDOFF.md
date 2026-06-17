@@ -60,7 +60,8 @@ cd ~/terminal-site && git pull && docker compose up -d --build
 ## Env-переменные (.env на VPS)
 `POSTGRES_USER/PASSWORD/DB`, `DATABASE_URL` (host=`db`), `AUTH_SECRET`, `AUTH_URL=https://klebold.xyz`,
 `SMTP_HOST/PORT/USER/PASS`, `EMAIL_FROM`, `SITE_NAME`, `TOKEN_ENC_KEY` (AES для Spotify-токенов),
-`SPOTIFY_CLIENT_ID/SECRET/REDIRECT_URI`, `REALTIME_SECRET` (общий секрет app↔realtime, `openssl rand -hex 32`).
+`SPOTIFY_CLIENT_ID/SECRET/REDIRECT_URI`, `REALTIME_SECRET` (общий секрет app↔realtime, `openssl rand -hex 32`),
+`SUPER_ADMIN_EMAILS` (email'ы супер-админов через запятую → доступ к `/dashboard/admin`).
 App также получает `REALTIME_INTERNAL_URL` (= `http://realtime:4000`, задаётся в docker-compose).
 
 ---
@@ -112,6 +113,12 @@ sound/matrix/login/...`), easter eggs (`sudo`, Konami-код), темы (green/a
 
 **Мобильная адаптация:** десктоп — сайдбар; мобила — верхняя плашка + нижний таб-бар; чат
 одно-панельный с «назад»; viewport/theme-color; iOS-zoom фикс (поля 16px на мобиле); safe-area.
+
+**Супер-админ:** `src/lib/admin.ts` — `isSuperAdmin(email)` по env `SUPER_ADMIN_EMAILS` (через запятую,
+email НЕ хардкодим — репо публичное). Раздел `/dashboard/admin` (`AdminUsers.tsx`): список юзеров +
+статы (всего/verified/2fa), удаление учёток (каскадом сносит сообщения/членства/2FA; нельзя удалить
+себя или другого админа; чистит и verification_tokens по email). Пункт «admin» в навигации виден только
+супер-админу. API: `GET /api/admin/users`, `DELETE /api/admin/users/[id]` (оба под `getAdmin()`).
 
 **Безопасность:** CSP + HSTS + X-Frame/nosniff/COOP, rate-limiting, argon2, шифрование Spotify-токенов,
 проверка участия в чатах, секреты только в .env. Контейнер от непривилегированного юзера.

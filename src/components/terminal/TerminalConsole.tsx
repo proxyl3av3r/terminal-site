@@ -271,6 +271,7 @@ export default function TerminalConsole({
         return;
       }
       push("invalid email or password", "err");
+      push("forgot it? type forgot to reset your password", "dim");
       setFlow(null);
     } catch {
       push("network unavailable, try again later", "err");
@@ -333,7 +334,13 @@ export default function TerminalConsole({
               }
             }}
             disabled={busy}
-            autoComplete={masked ? "current-password" : "off"}
+            autoComplete={
+              masked
+                ? flow?.cmd === "register"
+                  ? "new-password" // регистрация: не подставляем существующий пароль
+                  : "current-password"
+                : "off"
+            }
             autoCapitalize="off"
             autoCorrect="off"
             spellCheck={false}

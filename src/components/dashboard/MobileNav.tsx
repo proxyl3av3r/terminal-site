@@ -14,13 +14,18 @@ export default function MobileNav({
   username,
   shortId,
   avatar,
+  isAdmin,
 }: {
   username: string | null;
   shortId: string | null;
   avatar: AvatarConfig;
+  isAdmin?: boolean;
 }) {
   const pathname = usePathname();
   const unread = useUnread();
+  const navItems = isAdmin
+    ? [...NAV, { href: "/dashboard/admin", label: "admin", icon: "⚡" }]
+    : NAV;
 
   return (
     <>
@@ -46,7 +51,7 @@ export default function MobileNav({
 
       {/* нижний таб-бар */}
       <nav className="fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-white/10 bg-bg/95 backdrop-blur md:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-        {NAV.map((item) => {
+        {navItems.map((item) => {
           const active = pathname === item.href;
           return (
             <Link

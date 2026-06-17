@@ -14,14 +14,19 @@ export default function Sidebar({
   username,
   shortId,
   avatar,
+  isAdmin,
 }: {
   email: string;
   username: string | null;
   shortId: string | null;
   avatar: AvatarConfig;
+  isAdmin?: boolean;
 }) {
   const pathname = usePathname();
   const unread = useUnread();
+  const navItems = isAdmin
+    ? [...NAV, { href: "/dashboard/admin", label: "admin", icon: "⚡" }]
+    : NAV;
 
   return (
     <aside className="hidden w-56 shrink-0 flex-col border-r border-white/10 bg-bg-soft/60 p-4 md:flex">
@@ -38,7 +43,7 @@ export default function Sidebar({
       </div>
 
       <nav className="flex flex-col gap-1 text-sm">
-        {NAV.map((item) => {
+        {navItems.map((item) => {
           const active = pathname === item.href;
           return (
             <Link
