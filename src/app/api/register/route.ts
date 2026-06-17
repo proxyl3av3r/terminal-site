@@ -73,7 +73,9 @@ export async function POST(req: Request) {
   });
 
   const base = process.env.AUTH_URL ?? "http://localhost:3000";
-  const verifyUrl = `${base}/api/verify-email?token=${token}&email=${encodeURIComponent(email)}`;
+  // Ведём на лёгкую страницу подтверждения; сам verify — POST из браузера
+  // (префетч/сканеры почты, дёргающие ссылку GET-ом, токен не тратят).
+  const verifyUrl = `${base}/verify?token=${token}&email=${encodeURIComponent(email)}`;
 
   try {
     await sendVerificationEmail(email, verifyUrl);
