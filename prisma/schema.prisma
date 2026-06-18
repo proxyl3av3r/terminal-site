@@ -32,6 +32,9 @@ model User {
   lastClaimAt   DateTime?
   // Разблокированные платные опции аватара (ключи вида "color:4", "eyes:3").
   unlocks       String[]  @default([])
+  // Показывать ли «now playing» из Spotify на публичном профиле (/u/<ник>).
+  // По умолчанию выкл — приватность; включается тумблером в настройках.
+  publicSpotify Boolean   @default(false)
   // Хеш пароля (argon2). null допустим теоретически (напр. OAuth), но у нас
   // всегда заполнен при регистрации через credentials.
   passwordHash  String?

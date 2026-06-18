@@ -124,7 +124,9 @@ export default async function DashboardPage() {
                 <span className="w-5 text-right font-mono text-xs text-fg-dim">{i + 1}</span>
                 <Avatar config={parseAvatar(u.avatar, seed)} size={28} />
                 <span className="min-w-0 flex-1 truncate font-mono text-sm text-fg">
-                  @{u.username}
+                  <Link href={`/u/${u.username}`} className="hover:text-accent hover:underline">
+                    @{u.username}
+                  </Link>
                   <span className="ml-1.5 align-middle">
                     <Badges keys={u.badges.map((b) => b.key)} size={11} />
                   </span>
