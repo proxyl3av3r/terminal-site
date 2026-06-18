@@ -32,9 +32,13 @@ export default function AdminUsers() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Модалки вместо нативных prompt()/confirm() — те не работают в in-app браузерах.
+  const [ptsTarget, setPtsTarget] = useState<AdminUser | null>(null);
+  const [ptsInput, setPtsInput] = useState("");
+  const [delTarget, setDelTarget] = useState<AdminUser | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/admin/users");
+    const res = await fetch("/api/admin/users", { cache: "no-store" });
     const data = await res.json();
     if (data.ok) {
       setUsers(data.users);
@@ -60,32 +64,53 @@ export default function AdminUsers() {
     load();
   }
 
-  async function grantPoints(u: AdminUser) {
-    const raw = prompt(`grant points to ${u.email} (use negative to deduct):`, "1000");
-    if (raw === null) return;
-    const amount = parseInt(raw, 10);
-    if (!Number.isFinite(amount) || amount === 0) return;
-    setBusyId(u.id);
-    await fetch(`/api/admin/users/${u.id}/points`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount }),
-    }).catch(() => {});
-    setBusyId(null);
-    load();
-  }
-
-  async function remove(u: AdminUser) {
-    if (!confirm(`delete ${u.email}? this removes their account, messages and chats. cannot be undone.`)) {
-      return;
-    }
+  // Начислить/списать очки. amount может быть отрицательным.
+  async function applyPoints(amount: number) {
+    const u = ptsTarget;
+    if (!u || !Number.isFinite(amount) || amount === 0) return;
     setBusyId(u.id);
     setError(null);
-    const res = await fetch(`/api/admin/users/${u.id}`, { method: "DELETE" });
-    const data = await res.json().catch(() => ({}));
-    setBusyId(null);
-    if (data.ok) load();
-    else setError(data.error ?? "delete failed");
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}/points`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.ok) {
+        // Берём очки из ответа — без зависимости от кэша/повторной загрузки.
+        setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, points: data.points } : x)));
+        setPtsTarget(null);
+        setPtsInput("");
+      } else {
+        setError(data.error ?? `не удалось изменить очки (${res.status})`);
+      }
+    } catch {
+      setError("сеть недоступна");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function confirmDelete() {
+    const u = delTarget;
+    if (!u) return;
+    setBusyId(u.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.ok) {
+        setDelTarget(null);
+        load();
+      } else {
+        setError(data.error ?? "delete failed");
+      }
+    } catch {
+      setError("сеть недоступна");
+    } finally {
+      setBusyId(null);
+    }
   }
 
   return (
@@ -163,7 +188,11 @@ export default function AdminUsers() {
                   );
                 })}
                 <button
-                  onClick={() => grantPoints(u)}
+                  onClick={() => {
+                    setPtsTarget(u);
+                    setPtsInput("");
+                    setError(null);
+                  }}
                   disabled={busyId === u.id}
                   title="grant or deduct points"
                   className="rounded border border-white/15 px-1.5 py-0.5 font-mono text-[10px] text-fg-dim hover:text-accent disabled:opacity-40"
@@ -177,7 +206,10 @@ export default function AdminUsers() {
               <span className="shrink-0 font-mono text-[11px] text-fg-dim">you</span>
             ) : (
               <button
-                onClick={() => remove(u)}
+                onClick={() => {
+                  setDelTarget(u);
+                  setError(null);
+                }}
                 disabled={busyId === u.id || u.isAdmin}
                 title={u.isAdmin ? "can't delete another admin" : "delete account"}
                 className="shrink-0 rounded border border-danger/40 px-2.5 py-1 font-mono text-xs text-danger hover:bg-danger/10 disabled:opacity-30"
@@ -188,6 +220,89 @@ export default function AdminUsers() {
           </div>
         ))}
       </div>
+
+      {/* модалка очков (вместо prompt) */}
+      {ptsTarget && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
+          onMouseDown={(e) => e.target === e.currentTarget && setPtsTarget(null)}
+        >
+          <div className="w-[min(92vw,360px)] rounded-lg border border-white/10 bg-bg-soft p-5">
+            <div className="font-mono text-sm text-fg">очки · {ptsTarget.username ? `@${ptsTarget.username}` : ptsTarget.email}</div>
+            <div className="mt-1 font-mono text-xs text-fg-dim">
+              сейчас: <span className="text-accent-amber">{ptsTarget.points}</span> pts
+            </div>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {[100, 500, 1000, -100].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => applyPoints(n)}
+                  disabled={busyId === ptsTarget.id}
+                  className="rounded border border-white/15 px-2.5 py-1 font-mono text-xs text-fg-dim hover:text-accent disabled:opacity-40"
+                >
+                  {n > 0 ? `+${n}` : n}
+                </button>
+              ))}
+            </div>
+            <div className="mt-3 flex gap-2">
+              <input
+                value={ptsInput}
+                onChange={(e) => setPtsInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && applyPoints(parseInt(ptsInput, 10))}
+                inputMode="numeric"
+                placeholder="напр. 1000 или -50"
+                className="flex-1 rounded border border-white/10 bg-black/40 px-3 py-2 font-mono text-sm text-fg outline-none focus:border-accent"
+              />
+              <button
+                onClick={() => applyPoints(parseInt(ptsInput, 10))}
+                disabled={busyId === ptsTarget.id || !ptsInput.trim()}
+                className="rounded bg-accent px-3 py-2 font-mono text-xs text-bg disabled:opacity-40"
+              >
+                {busyId === ptsTarget.id ? "…" : "применить"}
+              </button>
+            </div>
+            {error && <p className="mt-2 font-mono text-xs text-danger">{error}</p>}
+            <button
+              onClick={() => setPtsTarget(null)}
+              className="mt-3 w-full rounded border border-white/10 py-1.5 font-mono text-xs text-fg-dim hover:text-fg"
+            >
+              закрыть
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* модалка удаления (вместо confirm) */}
+      {delTarget && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
+          onMouseDown={(e) => e.target === e.currentTarget && setDelTarget(null)}
+        >
+          <div className="w-[min(92vw,360px)] rounded-lg border border-white/10 bg-bg-soft p-5">
+            <div className="font-mono text-sm text-danger">удалить аккаунт?</div>
+            <p className="mt-2 text-xs text-fg-dim">
+              {delTarget.email} — снесёт учётку, сообщения и чаты. отменить нельзя.
+            </p>
+            {error && <p className="mt-2 font-mono text-xs text-danger">{error}</p>}
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => setDelTarget(null)}
+                disabled={busyId === delTarget.id}
+                className="flex-1 rounded border border-white/15 py-2 font-mono text-xs text-fg-dim hover:text-fg disabled:opacity-50"
+              >
+                отмена
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={busyId === delTarget.id}
+                className="flex-1 rounded border border-danger/50 bg-danger/10 py-2 font-mono text-xs text-danger disabled:opacity-50"
+              >
+                {busyId === delTarget.id ? "…" : "удалить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
