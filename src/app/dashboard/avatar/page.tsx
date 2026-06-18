@@ -19,10 +19,10 @@ export default async function AvatarPage() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-mono text-xl text-fg">
-            <span className="text-accent">$</span> avatar
+            <span className="text-accent">$</span> аватар
           </h1>
           <p className="mt-1 text-sm text-fg-dim">
-            customize your character. some options unlock with points.
+            собери своего робота. часть опций открывается за очки.
           </p>
         </div>
         <div className="rounded-lg border border-white/10 bg-bg-soft/50 px-4 py-2 font-mono text-sm">

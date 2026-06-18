@@ -61,3 +61,43 @@ body {
     font-size: 16px;
   }
 }
+
+/* ── Анимации аватара (effect). Классы применяет components/avatar/Avatar.tsx.
+   Уважают prefers-reduced-motion: при reduce анимация выключается. ── */
+@keyframes av-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes av-glow {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.7; }
+}
+@keyframes av-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  96% { transform: scaleY(0.1); }
+}
+@keyframes av-scan {
+  0% { transform: translateY(-12px); }
+  100% { transform: translateY(0); }
+}
+@keyframes av-holo {
+  0%, 100% { opacity: 1; }
+  48% { opacity: 0.92; }
+  50% { opacity: 0.78; }
+  52% { opacity: 0.92; }
+}
+.av-anim-float { animation: av-float 3.5s ease-in-out infinite; }
+.av-anim-glow { animation: av-glow 2.2s ease-in-out infinite; }
+.av-anim-blink { animation: av-blink 4s ease-in-out infinite; }
+.av-anim-scan { animation: av-scan 1.6s linear infinite; }
+.av-anim-holo { animation: av-holo 3s steps(1, end) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .av-anim-float,
+  .av-anim-glow,
+  .av-anim-blink,
+  .av-anim-scan,
+  .av-anim-holo {
+    animation: none;
+  }
+}

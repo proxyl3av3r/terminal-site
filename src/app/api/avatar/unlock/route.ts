@@ -6,7 +6,7 @@ import { CAT_OPTIONS, optionKey, type AvatarCat } from "@/lib/avatar";
 
 export const runtime = "nodejs";
 
-const CATS: AvatarCat[] = ["color", "bg", "eyes", "mouth"];
+const CATS: AvatarCat[] = ["color", "bg", "eyes", "mouth", "head", "antenna", "effect"];
 
 // Разблокировать платную опцию аватара за баллы. Списывает cost, добавляет ключ.
 export async function POST(req: Request) {
