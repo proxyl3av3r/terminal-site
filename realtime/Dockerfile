@@ -13,7 +13,7 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 realtime
 COPY --from=deps /app/node_modules ./node_modules
-COPY --chown=realtime:nodejs package.json server.mjs ./
+COPY --chown=realtime:nodejs package.json server.mjs game.mjs words.mjs ./
 USER realtime
 EXPOSE 4000
 CMD ["node", "server.mjs"]

@@ -19,6 +19,7 @@ import { Server } from "socket.io";
 import { parse as parseCookie } from "cookie";
 import { decode } from "@auth/core/jwt";
 import pg from "pg";
+import { attachGame } from "./game.mjs";
 
 const PORT = Number(process.env.PORT || 4000);
 const AUTH_SECRET = process.env.AUTH_SECRET;
@@ -154,6 +155,9 @@ function onlineUserIdsInRoom(room) {
   }
   return [...out];
 }
+
+// Игра «рисовалка-угадайка» — отдельный namespace «/game» (см. game.mjs).
+attachGame(io, { pool, userIdFromCookie });
 
 io.on("connection", (socket) => {
   const userId = socket.data.userId;

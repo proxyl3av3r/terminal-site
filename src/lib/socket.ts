@@ -19,3 +19,18 @@ export function getChatSocket(): Socket {
   }
   return socket;
 }
+
+// Сокет namespace «/game» для игры рисовалки-угадайки. Отдельное соединение,
+// тот же путь/ориджин и cookie-аутентификация.
+let gameSocket: Socket | null = null;
+
+export function getGameSocket(): Socket {
+  if (!gameSocket) {
+    gameSocket = io("/game", {
+      path: "/socket.io",
+      withCredentials: true,
+      reconnectionDelayMax: 8000,
+    });
+  }
+  return gameSocket;
+}
