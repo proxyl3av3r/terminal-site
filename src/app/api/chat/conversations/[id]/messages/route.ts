@@ -34,6 +34,7 @@ export async function GET(
       body: true,
       createdAt: true,
       senderId: true,
+      reactions: { select: { emoji: true, userId: true } },
       sender: {
         select: {
           username: true,
@@ -109,6 +110,7 @@ export async function POST(
       body: true,
       createdAt: true,
       senderId: true,
+      reactions: { select: { emoji: true, userId: true } },
       sender: {
         select: {
           username: true,

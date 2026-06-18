@@ -7,6 +7,7 @@ import { imageToAscii } from "@/lib/ascii";
 import { getChatSocket } from "@/lib/socket";
 import { canPost, canDeleteMessage } from "@/lib/roles";
 import { isSticker } from "@/lib/stickers";
+import { REACTION_EMOJIS, aggregateReactions, type RawReaction } from "@/lib/reactions";
 import ManagePanel from "@/components/chat/ManagePanel";
 import StickerPicker from "@/components/chat/StickerPicker";
 import Badges from "@/components/badges/Badges";
@@ -34,6 +35,7 @@ interface Message {
   createdAt: string;
   senderId: string;
   sender: PublicUser;
+  reactions: RawReaction[];
 }
 interface ChatRequest {
   id: string;
@@ -68,6 +70,7 @@ export default function ChatClient({
   const [text, setText] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [showStickers, setShowStickers] = useState(false);
+  const [reactingId, setReactingId] = useState<string | null>(null); // открыт пикер реакций на сообщении
   const [manageId, setManageId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -170,6 +173,19 @@ export default function ChatClient({
         loadMessages(p.conversationId);
       }
     };
+    // Реакции конкретного сообщения изменились — точечно обновить (без скролла).
+    const onReaction = (p: {
+      conversationId?: string;
+      messageId?: string;
+      reactions?: RawReaction[];
+    }) => {
+      if (p?.conversationId !== activeIdRef.current || !p.messageId) return;
+      setMessages((ms) =>
+        ms.map((m) =>
+          m.id === p.messageId ? { ...m, reactions: p.reactions ?? [] } : m,
+        ),
+      );
+    };
     const onPresence = (p: { conversationId?: string; userId?: string; online?: boolean }) => {
       if (!p?.userId || p.conversationId !== activeIdRef.current) return;
       setOnlineIds((prev) => {
@@ -201,6 +217,7 @@ export default function ChatClient({
     socket.on("conversation:bump", onBump);
     socket.on("conversation:updated", onUpdated);
     socket.on("message:deleted", onMsgDeleted);
+    socket.on("reaction", onReaction);
     socket.on("request:new", onRequest);
     socket.on("conversation:removed", onRemoved);
     socket.on("presence", onPresence);
@@ -211,6 +228,7 @@ export default function ChatClient({
       socket.off("conversation:bump", onBump);
       socket.off("conversation:updated", onUpdated);
       socket.off("message:deleted", onMsgDeleted);
+      socket.off("reaction", onReaction);
       socket.off("request:new", onRequest);
       socket.off("conversation:removed", onRemoved);
       socket.off("presence", onPresence);
@@ -306,6 +324,26 @@ export default function ChatClient({
       await sendBody("ascii", ascii);
     } catch {
       alert("could not process the image");
+    }
+  }
+
+  // Поставить/снять эмодзи-реакцию на сообщение. Realtime обновит у остальных.
+  async function toggleReaction(messageId: string, emoji: string) {
+    if (!activeId) return;
+    setReactingId(null);
+    const res = await fetch(
+      `/api/chat/conversations/${activeId}/messages/${messageId}/reactions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji }),
+      },
+    );
+    const data = await res.json();
+    if (data.ok) {
+      setMessages((ms) =>
+        ms.map((m) => (m.id === messageId ? { ...m, reactions: data.reactions } : m)),
+      );
     }
   }
 
@@ -536,17 +574,62 @@ export default function ChatClient({
                           {m.body}
                         </div>
                       )}
+
+                      {/* существующие реакции — клик тогглит мою */}
+                      {m.reactions.length > 0 && (
+                        <div className={`mt-1 flex flex-wrap gap-1 ${mine ? "justify-end" : ""}`}>
+                          {aggregateReactions(m.reactions, meId).map((r) => (
+                            <button
+                              key={r.emoji}
+                              onClick={() => toggleReaction(m.id, r.emoji)}
+                              className={`flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-xs leading-none ${
+                                r.mine
+                                  ? "border-accent/50 bg-accent/15 text-fg"
+                                  : "border-white/10 bg-white/5 text-fg-dim hover:border-white/25"
+                              }`}
+                            >
+                              <span>{r.emoji}</span>
+                              <span className="font-mono text-[10px]">{r.count}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* пикер новой реакции (по кнопке ☺) */}
+                      {reactingId === m.id && (
+                        <div className={`mt-1 inline-flex flex-wrap gap-0.5 rounded-lg border border-white/10 bg-bg-soft p-1 ${mine ? "justify-end" : ""}`}>
+                          {REACTION_EMOJIS.map((e) => (
+                            <button
+                              key={e}
+                              onClick={() => toggleReaction(m.id, e)}
+                              className="rounded px-1 text-base leading-none hover:bg-accent/15"
+                            >
+                              {e}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    {canDel && (
+                    <div className="flex shrink-0 items-center gap-0.5 self-center opacity-0 transition-opacity group-hover:opacity-100">
                       <button
-                        onClick={() => deleteMessage(m.id)}
-                        aria-label="delete message"
-                        title="delete"
-                        className="self-center px-1 font-mono text-xs text-fg-dim opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                        onClick={() => setReactingId((id) => (id === m.id ? null : m.id))}
+                        aria-label="react"
+                        title="react"
+                        className="px-1 font-mono text-xs text-fg-dim hover:text-accent"
                       >
-                        ×
+                        ☺
                       </button>
-                    )}
+                      {canDel && (
+                        <button
+                          onClick={() => deleteMessage(m.id)}
+                          aria-label="delete message"
+                          title="delete"
+                          className="px-1 font-mono text-xs text-fg-dim hover:text-danger"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}

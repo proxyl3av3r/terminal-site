@@ -56,6 +56,7 @@ model User {
   backupCodes         BackupCode[]
   conversationMembers ConversationMember[]
   messages            Message[]
+  reactions           MessageReaction[]
   badges              UserBadge[]
 
   @@map("users")
@@ -126,9 +127,28 @@ model Message {
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  reactions    MessageReaction[]
 
   @@index([conversationId, createdAt])
   @@map("messages")
+}
+
+// Эмодзи-реакция пользователя на сообщение. emoji — из белого списка
+// src/lib/reactions.ts. Уникальность (messageId,userId,emoji) делает toggle
+// идемпотентным: повторный клик той же реакцией её снимает.
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@map("message_reactions")
 }
 
 model Account {
