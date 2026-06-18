@@ -5,29 +5,41 @@
 
 ---
 
-## ⏱ Снимок состояния (на 2026-06-16)
+## ⏱ Снимок состояния (на 2026-06-18)
 
 **Чтобы продолжить на другом устройстве:** `git clone git@github.com:proxyl3av3r/terminal-site.git`
 → `npm install` → читать этот файл. `.env` в репозитории нет (только на VPS); локальной БД нет —
 правим код и деплоим (`git push` → на VPS `git pull && docker compose up -d --build`).
 
-**Готово и закоммичено в `main`:**
-- ✅ Realtime-чат (Socket.IO, контейнер `realtime`) — коммит `0ed8566`. **Задеплоено и работает вживую.**
-- ✅ UI создания групп — коммит `842671c`.
-- ✅ Полное управление чатами/группами/каналами (роли owner/admin/moderator/member, каналы-broadcast,
-  invite-ссылки, удаление/выход, удаление сообщений) — коммит `22b9529`. `tsc --noEmit` и `next build`
-  зелёные. Миграция `20260616120000_chat_management` (`kind`+`inviteToken`) — применится сервисом
-  `migrate` сама. **Новых env/nginx не требует.**
+**Готово и закоммичено в `main` (всё `tsc --noEmit` + `next build` зелёные):**
+- ✅ Realtime-чат, UI групп, управление чатами/каналами, значки (Фаза 1), экономика баллов (Фаза 2) —
+  ранее (коммиты `0ed8566`…`0f1aa93`).
+- ✅ **ASCII-стикеры** (`9b95051`): набор kaomoji/ASCII (`lib/stickers.ts`), пикер `StickerPicker`,
+  кнопка ☺ в композере. Шлются как `ascii`-сообщение — **миграции не требуют**. Рендер адаптивный
+  (узкие стикеры крупно, конверт картинки — мелко).
+- ✅ **Эмодзи-реакции** (`641c652`): модель `MessageReaction` (**миграция `20260618120000_message_reactions`**),
+  белый список (`lib/reactions.ts`), toggle-ручка `.../messages/[id]/reactions`, realtime-событие `reaction`,
+  чипы со счётчиком под сообщением.
+- ✅ **Публичные профили `/u/<ник>`** (`5a1a26a`): аватар/значки/баллы/ранг/стрик. Spotify now-playing —
+  по тумблеру (**миграция `20260618130000_public_spotify`**, `User.publicSpotify`, default off),
+  публичный эндпоинт `/api/u/[username]/now-playing` (только трек). Тумблер в настройках, ники в
+  лидерборде ведут на профиль.
+- ✅ **Фаза 4 — игра рисовалка-угадайка** (`d0f1256`): namespace `/game` в realtime-сервисе
+  (in-memory комнаты, **БД/миграций не требует**). Страница `/dashboard/game`. Новые файлы
+  `realtime/{game,words}.mjs` — **realtime-контейнер надо пересобрать** (Dockerfile обновлён).
 
-**Что проверить на VPS (если ещё не задеплоено после `22b9529`):**
+**Что задеплоить на VPS (ещё НЕ задеплоено после `0f1aa93`):**
 ```bash
-cd ~/terminal-site && git pull && docker compose up -d --build
-docker compose logs --tail=20 migrate   # миграция applied
+cd ~/terminal-site && git pull && docker compose up -d --build   # пересоберёт и app, и realtime
+docker compose logs --tail=30 migrate    # applied: message_reactions, public_spotify
+docker compose logs --tail=10 realtime    # слушает :4000 (теперь и /game namespace)
 ```
-Затем живой тест управления (роли/каналы/invite/удаление) — чек-лист ниже по разделам.
+**Новых env/nginx НЕ требует** (игра ходит по тому же `/socket.io/`, namespace мультиплексируется).
+Живой тест: стикеры/реакции в чате, `/u/<свой-ник>`, тумблер Spotify, игра (создать комнату →
+вторым аккаунтом войти по ссылке `?room=CODE` → старт → нарисовать/угадать).
 
-**Следующее по плану (роадмап ниже):** на выбор — `2. стикеры` (мелочь) или
-`4. Фаза 4 — игра рисовалка-угадайка` (крупная, ляжет на готовый realtime). Решение за владельцем.
+**Следующее по плану (роадмап ниже):** `Фаза 5` — реальные `points` за победы в игре →
+разблокировка locked-опций аватара (в `lib/avatar.ts` у опций есть `cost`). Решение за владельцем.
 
 ---
 
@@ -174,29 +186,36 @@ email НЕ хардкодим — репо публичное). Раздел `/d
 1. ✅ ~~**3c — WebSocket realtime**~~ — СДЕЛАНО (Socket.IO, контейнер `realtime`, typing, онлайн-статус,
    мгновенная доставка). Деплой: добавить `REALTIME_SECRET` в `.env` на VPS + обновить nginx-конфиг
    (`location /socket.io/`). Подробности — в «Ключевых решениях».
-2. **Стикеры** — набор готовых ASCII-артов (эмодзи уже работают как юникод-текст).
+2. ✅ ~~**Стикеры**~~ — СДЕЛАНО (`lib/stickers.ts`, `StickerPicker`, кнопка ☺; шлются как `ascii`).
 3. ✅ ~~**UI создания групп**~~ — СДЕЛАНО (модалка `NewChat`: direct/group/channel).
 3b. ✅ ~~**Полное управление чатами/группами/каналами**~~ — СДЕЛАНО: роли (owner/admin/moderator/
    member), панель `ManagePanel`, каналы (broadcast), invite-ссылки, удаление/выход, удаление
    сообщений. Миграция `20260616120000_chat_management` (`kind` + `inviteToken`). Детали — в
    разделах «Что сделано» и «Ключевые решения».
-4. **Фаза 4 — игра рисовалка-угадайка:** комнаты по ссылке/id, холст с цветами, чат сбоку, логика
-   слова, подсказки «горячо/холодно». Realtime — переиспользовать сервис `realtime/` (добавить
-   game-namespace/события, источник истины — также Next-ручки или сам сервис).
-5. **Фаза 5 — очки и разблокировки:** победы дают `points` → открывают locked-опции аватара
-   (в `lib/avatar.ts` у опций есть `cost`).
+4. ✅ ~~**Фаза 4 — игра рисовалка-угадайка**~~ — СДЕЛАНО (`d0f1256`): namespace `/game` в
+   realtime-сервисе (`realtime/game.mjs` + `words.mjs`, in-memory комнаты — источник истины сам
+   сервис, БД не трогает), страница `/dashboard/game` (`GameClient`/`GameCanvas`). Комнаты по коду/
+   ссылке, выбор слова, рисование (нормализованные координаты), угадывание в чате, подсказки
+   горячо/холодно, скоринг за скорость, host-миграция. Очки — пока внутриигровые (см. Фаза 5).
+5. **Фаза 5 — очки и разблокировки:** победы в игре дают реальные `points` → открывают locked-опции
+   аватара (в `lib/avatar.ts` у опций есть `cost`). Сейчас игра считает только внутренний счёт —
+   надо по концу партии начислить `points` (через Next-ручку с `REALTIME_SECRET` или прямым `pg`
+   из realtime-сервиса).
 6. **Серверный харденинг (осталось):** SSH только по ключу (добавить ключ Windows-машины перед
    отключением пароля!), fail2ban, `ufw enable`, unattended-upgrades, опц. Cloudflare-прокси.
 
 ## Структура (основное)
 ```
-src/app/            — страницы (home, dashboard/*, api/*)
-src/components/      — home/, terminal/, chat/, dashboard/, avatar/, canvas/
+src/app/            — страницы (home, dashboard/*, u/[username], api/*)
+src/components/      — home/, terminal/, chat/, dashboard/, avatar/, canvas/, game/, profile/, badges/
 src/lib/            — auth, db, email, tokens, 2fa, ratelimit, crypto, spotify,
                       profile, avatar, chat, roles (чистая логика прав, client-safe),
-                      ascii, realtime (server→socket), socket (client socket.io-client)
-src/components/chat/ — ChatClient, ManagePanel (управление), JoinInvite (вступление по ссылке)
-realtime/           — отдельный Socket.IO-сервис (server.mjs, Dockerfile) — свой контейнер
+                      ascii, stickers, reactions, badges, award, daily, admin,
+                      realtime (server→socket), socket (client socket.io-client; getChatSocket/getGameSocket)
+src/components/chat/ — ChatClient, ManagePanel, JoinInvite, StickerPicker
+src/components/game/ — GameClient (лобби+комната), GameCanvas (холст)
+src/app/u/[username]/— публичный профиль; src/components/profile/PublicNowPlaying
+realtime/           — Socket.IO-сервис: server.mjs (чат) + game.mjs + words.mjs (игра /game namespace)
 prisma/             — schema.prisma + migrations/
 Dockerfile, docker-compose.yml, deploy/nginx.conf.example, DEPLOY.md
 ```
