@@ -6,7 +6,9 @@ import { parseAvatar } from "@/lib/avatar";
 import { imageToAscii } from "@/lib/ascii";
 import { getChatSocket } from "@/lib/socket";
 import { canPost, canDeleteMessage } from "@/lib/roles";
+import { isSticker } from "@/lib/stickers";
 import ManagePanel from "@/components/chat/ManagePanel";
+import StickerPicker from "@/components/chat/StickerPicker";
 import Badges from "@/components/badges/Badges";
 
 interface PublicUser {
@@ -65,6 +67,7 @@ export default function ChatClient({
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const [showNew, setShowNew] = useState(false);
+  const [showStickers, setShowStickers] = useState(false);
   const [manageId, setManageId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -379,7 +382,13 @@ export default function ChatClient({
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-mono text-sm text-fg">{titleOf(c)}</div>
                     <div className="truncate text-xs text-fg-dim">
-                      {c.last ? (c.last.kind === "ascii" ? "[ascii image]" : c.last.body) : "—"}
+                      {c.last
+                        ? c.last.kind === "ascii"
+                          ? isSticker(c.last.body)
+                            ? c.last.body.replace(/\n/g, " ")
+                            : "[ascii image]"
+                          : c.last.body
+                        : "—"}
                     </div>
                   </div>
                 </button>
@@ -512,7 +521,14 @@ export default function ChatClient({
                         </div>
                       )}
                       {m.kind === "ascii" ? (
-                        <pre className="inline-block overflow-x-auto rounded bg-black/40 p-2 text-left font-mono text-accent" style={{ fontSize: "5px", lineHeight: "5px" }}>
+                        <pre
+                          className="inline-block overflow-x-auto rounded bg-black/40 p-2 text-left font-mono text-accent"
+                          style={
+                            isSticker(m.body)
+                              ? { fontSize: "13px", lineHeight: "15px" }
+                              : { fontSize: "5px", lineHeight: "5px" }
+                          }
+                        >
                           {m.body}
                         </pre>
                       ) : (
@@ -539,8 +555,23 @@ export default function ChatClient({
             {canPostHere ? (
               <form
                 onSubmit={(e) => { e.preventDefault(); send(); }}
-                className="flex items-center gap-2 border-t border-white/10 px-3 py-2.5"
+                className="relative flex items-center gap-2 border-t border-white/10 px-3 py-2.5"
               >
+                {showStickers && (
+                  <StickerPicker
+                    onClose={() => setShowStickers(false)}
+                    onPick={(art) => sendBody("ascii", art)}
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowStickers((s) => !s)}
+                  aria-label="stickers"
+                  className={`shrink-0 font-mono text-base hover:text-accent ${showStickers ? "text-accent" : "text-fg-dim"}`}
+                  title="stickers"
+                >
+                  ☺
+                </button>
                 <button
                   type="button"
                   onClick={() => fileRef.current?.click()}
