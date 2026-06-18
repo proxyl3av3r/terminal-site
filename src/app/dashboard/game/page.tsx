@@ -17,12 +17,12 @@ export default async function GamePage() {
     return (
       <div className="mx-auto max-w-2xl">
         <h1 className="font-mono text-xl text-fg">
-          <span className="text-accent">$</span> draw &amp; guess
+          <span className="text-accent">$</span> рисуй и угадывай
         </h1>
         <p className="mt-3 text-sm text-fg-dim">
-          pick a username first so others see who&apos;s drawing →{" "}
+          сначала выбери ник, чтобы другие видели, кто рисует →{" "}
           <a href="/dashboard/settings" className="text-accent underline">
-            settings
+            настройки
           </a>
         </p>
       </div>

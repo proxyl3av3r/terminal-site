@@ -15,7 +15,9 @@ const TURN_SECONDS = 75; // длительность хода
 const ROUNDEND_SECONDS = 6; // пауза между ходами (показ слова/очков)
 const CHOOSE_SECONDS = 15; // сколько даём рисующему на выбор слова
 const WORD_CHOICES = 3;
-const TOTAL_ROUNDS = 3; // сколько раз каждый игрок рисует
+const TOTAL_ROUNDS = 3; // дефолт; хост может выбрать в лобби
+const MIN_ROUNDS = 1;
+const MAX_ROUNDS = 8;
 const MAX_PLAYERS = 12;
 const MAX_STROKE_OPS = 8000; // потолок операций рисования в ходе (память)
 const EMPTY_ROOM_TTL = 60_000; // удалить комнату, если все ушли, через минуту
@@ -68,12 +70,12 @@ const normalizeGuess = (s) => String(s ?? "").trim().toLowerCase().replace(/\s+/
 // Маска слова: открытые буквы + «_», пробелы/неалфавитные символы видны.
 function maskWord(word, revealed) {
   const idxs = [];
-  for (let i = 0; i < word.length; i++) if (/[a-z0-9]/i.test(word[i])) idxs.push(i);
+  for (let i = 0; i < word.length; i++) if (/[a-zа-яё0-9]/i.test(word[i])) idxs.push(i);
   const show = new Set(idxs.slice(0, revealed));
   let out = "";
   for (let i = 0; i < word.length; i++) {
     if (word[i] === " ") out += "  ";
-    else if (!/[a-z0-9]/i.test(word[i])) out += word[i];
+    else if (!/[a-zа-яё0-9]/i.test(word[i])) out += word[i];
     else out += show.has(i) ? word[i] : "_";
   }
   return out;
@@ -91,6 +93,7 @@ function playersView(room) {
       guessed: room.guessedThisRound.has(p.id),
       drawing: p.id === room.drawerId,
       isHost: p.id === room.hostId,
+      awarded: room.awards ? room.awards.get(p.id) ?? 0 : 0, // начислено points (на финале)
     }))
     .sort((a, b) => b.score - a.score);
 }
@@ -204,7 +207,7 @@ export function attachGame(io, { pool, userIdFromCookie }) {
 
     nsp.to(`room:${room.code}`).emit("game:clear");
     broadcastState(room);
-    sysMessage(room, `${drawer.username} is choosing a word…`);
+    sysMessage(room, `${drawer.username} выбирает слово…`);
     // Предложить слова рисующему.
     for (const sid of drawer.sockets) {
       nsp.to(sid).emit("game:choices", { words: room.choices });
@@ -223,12 +226,12 @@ export function attachGame(io, { pool, userIdFromCookie }) {
     room.revealed = 0;
     room.turnEndsAt = Date.now() + TURN_SECONDS * 1000;
     broadcastState(room);
-    sysMessage(room, "draw! everyone else — guess in chat.");
+    sysMessage(room, "рисуй! остальные — угадывайте в чате.");
 
     room.turnTimer = setTimeout(() => endTurn(room, "time"), TURN_SECONDS * 1000);
 
     // Постепенно открываем буквы (до половины слова) во второй половине хода.
-    const letters = room.word.replace(/[^a-z0-9]/gi, "").length;
+    const letters = room.word.replace(/[^a-zа-яё0-9]/gi, "").length;
     const maxReveal = Math.max(0, Math.floor(letters / 2));
     room.revealTimer = setInterval(() => {
       if (room.status !== "playing") return;
@@ -257,25 +260,50 @@ export function attachGame(io, { pool, userIdFromCookie }) {
     sysMessage(
       room,
       reason === "all"
-        ? `everyone guessed it! the word was "${room.word}"`
-        : `time! the word was "${room.word}"`,
+        ? `все угадали! слово было «${room.word}»`
+        : `время вышло! слово было «${room.word}»`,
       "reveal",
     );
-    if (drawer) sysMessage(room, `${drawer.username} drew "${room.word}"`);
+    if (drawer) sysMessage(room, `${drawer.username} рисовал «${room.word}»`);
     broadcastState(room);
 
     room.turnIndex += 1;
     room.turnTimer = setTimeout(() => beginTurn(room), ROUNDEND_SECONDS * 1000);
   }
 
-  function endGame(room) {
+  // Начислить реальные User.points по итогам партии (Фаза 5). База — за
+  // внутриигровой счёт, плюс бонус за топ-3. Пишем прямо в БД (pg есть в сервисе).
+  async function awardPoints(room) {
+    const ranked = playersView(room).filter((p) => p.score > 0); // уже отсортированы по убыванию
+    const bonus = [20, 10, 5];
+    const awards = new Map();
+    for (let i = 0; i < ranked.length; i++) {
+      const total = Math.round(ranked[i].score / 10) + (i < bonus.length ? bonus[i] : 0);
+      if (total > 0) awards.set(ranked[i].id, total);
+    }
+    room.awards = awards;
+    for (const [userId, pts] of awards) {
+      try {
+        await pool.query(`UPDATE users SET points = points + $1 WHERE id = $2`, [pts, userId]);
+      } catch (e) {
+        console.error("[game] award points failed:", e.message);
+      }
+    }
+  }
+
+  async function endGame(room) {
     clearTimers(room);
     room.status = "gameover";
     room.drawerId = null;
     room.word = null;
+    await awardPoints(room); // заполнит room.awards до рассылки финала
     const winner = playersView(room)[0];
     broadcastState(room);
-    if (winner) sysMessage(room, `game over — ${winner.username} wins with ${winner.score} pts! 🏆`, "reveal");
+    if (winner && winner.score > 0) {
+      sysMessage(room, `игра окончена — победил ${winner.username}: ${winner.score} очк.! 🏆`, "reveal");
+    } else {
+      sysMessage(room, "игра окончена", "reveal");
+    }
   }
 
   // ── аутентификация namespace ─────────────────────────────────────────
@@ -330,12 +358,12 @@ export function attachGame(io, { pool, userIdFromCookie }) {
       const code = String(raw?.code ?? "").toUpperCase().trim();
       const room = rooms.get(code);
       if (!room) {
-        if (typeof ack === "function") ack({ ok: false, error: "room not found" });
+        if (typeof ack === "function") ack({ ok: false, error: "комната не найдена" });
         return;
       }
       const existing = room.players.get(userId);
       if (!existing && room.players.size >= MAX_PLAYERS) {
-        if (typeof ack === "function") ack({ ok: false, error: "room is full" });
+        if (typeof ack === "function") ack({ ok: false, error: "комната заполнена" });
         return;
       }
       if (room.emptyTimer) {
@@ -357,7 +385,7 @@ export function attachGame(io, { pool, userIdFromCookie }) {
         room.players.set(userId, player);
         // Новых игроков ставим в конец очереди ходов.
         if (!room.order.includes(userId)) room.order.push(userId);
-        sysMessage(room, `${player.username} joined`);
+        sysMessage(room, `${player.username} зашёл`);
       }
       player.sockets.add(socket.id);
 
@@ -367,22 +395,38 @@ export function attachGame(io, { pool, userIdFromCookie }) {
       broadcastState(room);
     });
 
-    // Хост запускает партию.
-    socket.on("game:start", () => {
+    // Хост запускает партию. Может задать число раундов { rounds }.
+    socket.on("game:start", (raw) => {
       const room = getRoom();
       if (!room || room.hostId !== userId) return;
       const present = [...room.players.values()].filter((p) => p.sockets.size > 0);
       if (present.length < 2) {
-        socket.emit("game:chat", { tone: "sys", text: "need at least 2 players", at: Date.now() });
+        socket.emit("game:chat", { tone: "sys", text: "нужно минимум 2 игрока", at: Date.now() });
         return;
       }
       if (room.status !== "lobby" && room.status !== "gameover") return;
       // Сброс на новую партию.
+      const rounds = Math.round(Number(raw?.rounds));
+      room.totalRounds = Number.isFinite(rounds)
+        ? Math.min(MAX_ROUNDS, Math.max(MIN_ROUNDS, rounds))
+        : room.totalRounds || TOTAL_ROUNDS;
       for (const p of room.players.values()) p.score = 0;
+      room.awards = null;
       room.order = [...room.players.keys()];
       room.round = 1;
       room.turnIndex = 0;
       beginTurn(room);
+    });
+
+    // Хост меняет число раундов в лобби (для всех видно).
+    socket.on("game:setrounds", (raw) => {
+      const room = getRoom();
+      if (!room || room.hostId !== userId) return;
+      if (room.status !== "lobby" && room.status !== "gameover") return;
+      const rounds = Math.round(Number(raw?.rounds));
+      if (!Number.isFinite(rounds)) return;
+      room.totalRounds = Math.min(MAX_ROUNDS, Math.max(MIN_ROUNDS, rounds));
+      broadcastState(room);
     });
 
     // Рисующий выбрал слово.
@@ -437,7 +481,7 @@ export function attachGame(io, { pool, userIdFromCookie }) {
           player.score += Math.round(50 + 250 * frac);
           const drawer = room.players.get(room.drawerId);
           if (drawer) drawer.score += 25;
-          sysMessage(room, `${player.username} guessed the word! ✅`, "correct");
+          sysMessage(room, `${player.username} угадал слово! ✅`, "correct");
           broadcastState(room);
           if (everyoneGuessed(room)) endTurn(room, "all");
           return;
@@ -445,10 +489,10 @@ export function attachGame(io, { pool, userIdFromCookie }) {
         // Подсказка «горячо/холодно» — только самому угадывающему.
         const dist = levenshtein(guess, answer);
         const ratio = dist / Math.max(answer.length, 1);
-        if (ratio <= 0.25 || guess.length >= 3 && answer.includes(guess)) {
-          socket.emit("game:hint", { level: "hot", text: "🔥 very close!" });
+        if (ratio <= 0.25 || (guess.length >= 3 && answer.includes(guess))) {
+          socket.emit("game:hint", { level: "hot", text: "🔥 очень близко!" });
         } else if (ratio <= 0.5) {
-          socket.emit("game:hint", { level: "warm", text: "warm…" });
+          socket.emit("game:hint", { level: "warm", text: "теплее…" });
         }
       }
 
@@ -471,10 +515,10 @@ export function attachGame(io, { pool, userIdFromCookie }) {
         if (player.sockets.size === 0) {
           // Если рисующий ушёл — завершаем ход.
           if (room.drawerId === userId && room.status === "playing") {
-            sysMessage(room, `${player.username} (drawer) left`);
+            sysMessage(room, `${player.username} (рисующий) вышел`);
             endTurn(room, "time");
           } else {
-            sysMessage(room, `${player.username} left`);
+            sysMessage(room, `${player.username} вышел`);
           }
           // Хост ушёл — передать первому присутствующему.
           if (room.hostId === userId) {
