@@ -420,8 +420,8 @@ export default function GameClient({ meId }: { meId: string }) {
               </div>
             </div>
 
-            <div className="flex min-h-[12rem] flex-1 flex-col rounded-lg border border-white/10 bg-bg-soft/40">
-              <div ref={chatRef} className="flex-1 space-y-0.5 overflow-y-auto p-2 text-xs">
+            <div className="flex h-[clamp(12rem,42vh,30rem)] flex-col rounded-lg border border-white/10 bg-bg-soft/40">
+              <div ref={chatRef} className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-2 text-xs">
                 {messages.map((m, i) => (
                   <div key={i} className="break-words">
                     {m.tone === "user" || m.tone === "guessed" ? (
