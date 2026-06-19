@@ -8,6 +8,7 @@ import { getChatSocket } from "@/lib/socket";
 import { canPost, canDeleteMessage } from "@/lib/roles";
 import { isSticker } from "@/lib/stickers";
 import { REACTION_EMOJIS, aggregateReactions, type RawReaction } from "@/lib/reactions";
+import { useConfirm } from "@/components/ui/useConfirm";
 import ManagePanel from "@/components/chat/ManagePanel";
 import StickerPicker from "@/components/chat/StickerPicker";
 import Badges from "@/components/badges/Badges";
@@ -62,6 +63,7 @@ export default function ChatClient({
   meId: string;
   meUsername: string;
 }) {
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [convos, setConvos] = useState<Conversation[]>([]);
   const [requests, setRequests] = useState<ChatRequest[]>([]);
   const [tab, setTab] = useState<"chats" | "requests">("chats");
@@ -349,7 +351,8 @@ export default function ChatClient({
 
   // Удалить сообщение (своё или, если хватает прав, чужое). Realtime разошлёт.
   async function deleteMessage(messageId: string) {
-    if (!activeId || !confirm("delete this message?")) return;
+    if (!activeId) return;
+    if (!(await confirm("delete this message?", { danger: true, confirmLabel: "delete" }))) return;
     const res = await fetch(`/api/chat/conversations/${activeId}/messages/${messageId}`, {
       method: "DELETE",
     });
@@ -721,6 +724,8 @@ export default function ChatClient({
           }}
         />
       )}
+
+      {confirmDialog}
     </div>
   );
 }

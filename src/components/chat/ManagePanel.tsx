@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Avatar from "@/components/avatar/Avatar";
 import { parseAvatar } from "@/lib/avatar";
 import { getChatSocket } from "@/lib/socket";
+import { useConfirm } from "@/components/ui/useConfirm";
 import {
   rank,
   canManage,
@@ -64,6 +65,7 @@ export default function ManagePanel({
   const [nameDraft, setNameDraft] = useState("");
   const [q, setQ] = useState("");
   const [found, setFound] = useState<FoundUser | null | "none">(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/chat/conversations/${conversationId}`);
@@ -156,7 +158,7 @@ export default function ManagePanel({
   }
 
   async function transfer(userId: string, name: string) {
-    if (!confirm(`Transfer ownership to @${name}? You will become admin.`)) return;
+    if (!(await confirm(`Transfer ownership to @${name}? You will become admin.`))) return;
     const data = await api(
       `/api/chat/conversations/${conversationId}/members/${userId}`,
       "PATCH",
@@ -166,7 +168,7 @@ export default function ManagePanel({
   }
 
   async function removeMember(userId: string, name: string) {
-    if (!confirm(`Remove @${name} from the chat?`)) return;
+    if (!(await confirm(`Remove @${name} from the chat?`, { danger: true, confirmLabel: "remove" }))) return;
     const data = await api(
       `/api/chat/conversations/${conversationId}/members/${userId}`,
       "DELETE",
@@ -175,13 +177,13 @@ export default function ManagePanel({
   }
 
   async function leave() {
-    if (!confirm(isDM ? "Delete this chat?" : "Leave this chat?")) return;
+    if (!(await confirm(isDM ? "Delete this chat?" : "Leave this chat?", { danger: true, confirmLabel: isDM ? "delete" : "leave" }))) return;
     const data = await api(`/api/chat/conversations/${conversationId}/leave`, "POST");
     if (data.ok) onRemoved();
   }
 
   async function destroy() {
-    if (!confirm("Delete this chat for everyone? This cannot be undone.")) return;
+    if (!(await confirm("Delete this chat for everyone? This cannot be undone.", { danger: true, confirmLabel: "delete" }))) return;
     const data = await api(`/api/chat/conversations/${conversationId}`, "DELETE");
     if (data.ok) onRemoved();
   }
@@ -205,6 +207,7 @@ export default function ManagePanel({
 
   return (
     <Shell onClose={onClose}>
+      {confirmDialog}
       <div className="mb-4 font-mono text-sm text-accent">
         $ manage {isDM ? "chat" : kind}
       </div>
