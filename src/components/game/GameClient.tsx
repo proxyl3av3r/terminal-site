@@ -5,7 +5,7 @@ import type { Socket } from "socket.io-client";
 import { getGameSocket } from "@/lib/socket";
 import Avatar from "@/components/avatar/Avatar";
 import { parseAvatar } from "@/lib/avatar";
-import GameCanvas from "@/components/game/GameCanvas";
+import GameCanvas, { type Tool } from "@/components/game/GameCanvas";
 import GameFinale from "@/components/game/GameFinale";
 
 interface PlayerV {
@@ -41,12 +41,10 @@ interface Msg {
   at: number;
 }
 
-const COLORS = ["#111111", "#ffffff", "#e23636", "#ff8c00", "#39ff14", "#1f8fff", "#a855f7", "#8b5a2b"];
-const SIZES: { label: string; v: number }[] = [
-  { label: "S", v: 0.006 },
-  { label: "M", v: 0.013 },
-  { label: "L", v: 0.024 },
-];
+const COLORS = ["#111111", "#ffffff", "#e23636", "#ff8c00", "#ffd700", "#39ff14", "#1f8fff", "#a855f7", "#ff2d8a", "#8b5a2b"];
+// Толщина кисти как доля ширины холста; слайдер задаёт значение между этими.
+const BRUSH_MIN = 0.004;
+const BRUSH_MAX = 0.06;
 const ROUND_CHOICES = [2, 3, 4, 5, 6];
 
 export default function GameClient({ meId }: { meId: string }) {
@@ -59,7 +57,8 @@ export default function GameClient({ meId }: { meId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [color, setColor] = useState(COLORS[0]);
-  const [sizeNorm, setSizeNorm] = useState(SIZES[1].v);
+  const [sizeNorm, setSizeNorm] = useState(0.013);
+  const [tool, setTool] = useState<Tool>("brush");
   const [now, setNow] = useState(Date.now());
   const [copied, setCopied] = useState(false);
 
@@ -286,7 +285,7 @@ export default function GameClient({ meId }: { meId: string }) {
             </div>
 
             <div className="relative">
-              <GameCanvas socket={socketRef.current!} canDraw={state.canDraw} color={color} sizeNorm={sizeNorm} />
+              <GameCanvas socket={socketRef.current!} canDraw={state.canDraw} color={color} sizeNorm={sizeNorm} tool={tool} />
 
               {hint && (
                 <div className="pointer-events-none absolute right-2 top-2 rounded bg-black/70 px-2 py-1 font-mono text-xs text-accent-amber">
@@ -363,35 +362,75 @@ export default function GameClient({ meId }: { meId: string }) {
 
             {/* тулбар рисующего */}
             {state.canDraw && (
-              <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-bg-soft/40 px-3 py-2">
-                <div className="flex gap-1">
-                  {COLORS.map((c) => (
-                    <button
-                      key={c}
-                      onClick={() => setColor(c)}
-                      aria-label={`цвет ${c}`}
-                      className={`h-6 w-6 rounded-full border-2 ${color === c ? "border-accent" : "border-white/20"}`}
-                      style={{ backgroundColor: c }}
-                    />
-                  ))}
-                </div>
-                <div className="ml-1 flex gap-1">
-                  {SIZES.map((s) => (
-                    <button
-                      key={s.label}
-                      onClick={() => setSizeNorm(s.v)}
-                      className={`h-6 w-7 rounded font-mono text-xs ${sizeNorm === s.v ? "bg-accent text-bg" : "border border-white/15 text-fg-dim"}`}
+              <div className="mt-2 space-y-2 rounded-lg border border-white/10 bg-bg-soft/40 px-3 py-2">
+                {/* инструменты + цвета */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex gap-1">
+                    <ToolBtn active={tool === "brush"} onClick={() => setTool("brush")} title="кисть"><BrushIcon /></ToolBtn>
+                    <ToolBtn active={tool === "fill"} onClick={() => setTool("fill")} title="заливка"><FillIcon /></ToolBtn>
+                    <ToolBtn active={tool === "eraser"} onClick={() => setTool("eraser")} title="ластик"><EraserIcon /></ToolBtn>
+                  </div>
+                  <span className="h-6 w-px bg-white/10" />
+                  <div className="flex flex-wrap items-center gap-1">
+                    {COLORS.map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => { setColor(c); if (tool === "eraser") setTool("brush"); }}
+                        aria-label={`цвет ${c}`}
+                        className={`h-6 w-6 rounded-full border-2 ${color === c && tool !== "eraser" ? "border-accent" : "border-white/20"}`}
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                    {/* свой цвет из палитры */}
+                    <label
+                      title="свой цвет"
+                      className={`relative grid h-6 w-6 cursor-pointer place-items-center overflow-hidden rounded-full border-2 ${
+                        !COLORS.includes(color) && tool !== "eraser" ? "border-accent" : "border-white/20"
+                      }`}
+                      style={{ background: COLORS.includes(color) ? "conic-gradient(red,#ff0,lime,cyan,blue,magenta,red)" : color }}
                     >
-                      {s.label}
-                    </button>
-                  ))}
+                      <input
+                        type="color"
+                        value={color}
+                        onChange={(e) => { setColor(e.target.value); if (tool === "eraser") setTool("brush"); }}
+                        className="absolute inset-0 cursor-pointer opacity-0"
+                        aria-label="выбрать свой цвет"
+                      />
+                    </label>
+                  </div>
+                  <button
+                    onClick={clearCanvas}
+                    title="очистить холст"
+                    className="ml-auto flex items-center gap-1 rounded border border-white/15 px-2.5 py-1 font-mono text-xs text-fg-dim hover:text-danger"
+                  >
+                    <TrashIcon /> очистить
+                  </button>
                 </div>
-                <button
-                  onClick={clearCanvas}
-                  className="ml-auto rounded border border-white/15 px-3 py-1 font-mono text-xs text-fg-dim hover:text-danger"
-                >
-                  очистить
-                </button>
+                {/* толщина кисти */}
+                <div className="flex items-center gap-3">
+                  <span className="shrink-0 font-mono text-[11px] text-fg-dim">толщина</span>
+                  <input
+                    type="range"
+                    min={Math.round(BRUSH_MIN * 1000)}
+                    max={Math.round(BRUSH_MAX * 1000)}
+                    step={1}
+                    value={Math.round(sizeNorm * 1000)}
+                    onChange={(e) => setSizeNorm(Number(e.target.value) / 1000)}
+                    className="h-1.5 flex-1 cursor-pointer accent-accent"
+                    aria-label="толщина кисти"
+                  />
+                  <span className="grid h-6 w-6 shrink-0 place-items-center">
+                    <span
+                      className="rounded-full"
+                      style={{
+                        width: `${Math.min(22, Math.max(3, sizeNorm * 300))}px`,
+                        height: `${Math.min(22, Math.max(3, sizeNorm * 300))}px`,
+                        backgroundColor: tool === "eraser" ? "#fff" : color,
+                        border: "1px solid rgba(255,255,255,0.25)",
+                      }}
+                    />
+                  </span>
+                </div>
               </div>
             )}
           </div>
@@ -473,3 +512,66 @@ export default function GameClient({ meId }: { meId: string }) {
     </div>
   );
 }
+
+// ── Иконки тулбара (в нашем терминальном стиле, currentColor) ──
+function ToolBtn({
+  active,
+  onClick,
+  title,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      className={`grid h-7 w-7 place-items-center rounded ${
+        active ? "bg-accent text-bg" : "border border-white/15 text-fg-dim hover:text-fg"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+const iconProps = {
+  width: 16,
+  height: 16,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+};
+
+const BrushIcon = () => (
+  <svg {...iconProps}>
+    <path d="M3 21l3.5-.7L18 8.8 15.2 6 3.7 17.5 3 21z" />
+    <path d="M14 7l3 3" />
+  </svg>
+);
+const FillIcon = () => (
+  <svg {...iconProps}>
+    <path d="M5 11l6-6 7 7-6 6a2 2 0 0 1-2.8 0l-4.2-4.2a2 2 0 0 1 0-2.8z" />
+    <path d="M19 14c1 1.5 2 2.7 2 4a2 2 0 1 1-4 0c0-1.3 1-2.5 2-4z" />
+  </svg>
+);
+const EraserIcon = () => (
+  <svg {...iconProps}>
+    <path d="M7 21h10" />
+    <path d="M5 13l6-6 7 7-5 5H8z" />
+  </svg>
+);
+const TrashIcon = () => (
+  <svg {...iconProps} width={14} height={14}>
+    <path d="M4 7h16" />
+    <path d="M9 7V5h6v2" />
+    <path d="M6 7l1 13h10l1-13" />
+  </svg>
+);
