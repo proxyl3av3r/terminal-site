@@ -67,6 +67,21 @@ function levenshtein(a, b) {
 
 const normalizeGuess = (s) => String(s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 
+// Per-socket sliding-window лимит на событие (анти-флуд внутри комнаты).
+// Возвращает true, если событие в пределах лимита.
+function sockLimit(socket, name, limit, windowMs) {
+  const now = Date.now();
+  socket.data.rl = socket.data.rl || {};
+  const arr = (socket.data.rl[name] || []).filter((t) => now - t < windowMs);
+  if (arr.length >= limit) {
+    socket.data.rl[name] = arr;
+    return false;
+  }
+  arr.push(now);
+  socket.data.rl[name] = arr;
+  return true;
+}
+
 // Маска слова: открытые буквы + «_», пробелы/неалфавитные символы видны.
 function maskWord(word, revealed) {
   const idxs = [];
@@ -443,6 +458,8 @@ export function attachGame(io, { pool, userIdFromCookie }) {
       const room = getRoom();
       if (!room || room.status !== "playing" || room.drawerId !== userId) return;
       if (!op || typeof op !== "object") return;
+      // Анти-флуд: ~160 операций/сек хватает для плавной линии, но режет спам.
+      if (!sockLimit(socket, "draw", 800, 5000)) return;
       if (room.strokes.length < MAX_STROKE_OPS) room.strokes.push(op);
       socket.to(`room:${room.code}`).emit("game:draw", op);
     });
@@ -459,6 +476,8 @@ export function attachGame(io, { pool, userIdFromCookie }) {
     socket.on("game:guess", (raw) => {
       const room = getRoom();
       if (!room) return;
+      // Анти-флуд чата/догадок: не больше 12 сообщений за 5с на сокет.
+      if (!sockLimit(socket, "guess", 12, 5000)) return;
       const text = String(raw?.text ?? "").slice(0, 120);
       if (!text.trim()) return;
       const player = room.players.get(userId);

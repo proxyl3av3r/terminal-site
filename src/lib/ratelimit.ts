@@ -37,9 +37,24 @@ export function rateLimit(
   return { success: true, remaining: limit - hits.length, retryAfterSec: 0 };
 }
 
-/** Достаём IP клиента из заголовков прокси (Nginx ставит x-forwarded-for). */
+/**
+ * IP клиента для rate-limit ключей.
+ *
+ * ВАЖНО (анти-спуфинг): доверяем ТОЛЬКО заголовкам, которые ставит наш Nginx.
+ * Nginx задаёт `X-Real-IP $remote_addr` (реальный адрес, клиент его не
+ * контролирует) и `X-Forwarded-For $proxy_add_x_forwarded_for` — последний
+ * ДОПИСЫВАЕТ реальный IP в конец к присланному клиентом. Поэтому ПЕРВЫЙ элемент
+ * XFF подделывается клиентом (`X-Forwarded-For: 1.2.3.4` → свежий лимит). Берём
+ * x-real-ip, а если его нет — ПОСЛЕДНИЙ элемент XFF (ближайший к серверу хоп).
+ * Приложение слушает только 127.0.0.1, наружу — только через Nginx.
+ */
 export function clientIp(req: Request): string {
+  const realIp = req.headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
   const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
-  return req.headers.get("x-real-ip") ?? "unknown";
+  if (xff) {
+    const parts = xff.split(",").map((s) => s.trim()).filter(Boolean);
+    if (parts.length) return parts[parts.length - 1];
+  }
+  return "unknown";
 }
