@@ -10,6 +10,7 @@ import { normalizeUsername } from "@/lib/profile";
 import { BADGES, sortBadgeKeys } from "@/lib/badges";
 import Avatar from "@/components/avatar/Avatar";
 import PublicNowPlaying from "@/components/profile/PublicNowPlaying";
+import ProfileShareButton from "@/components/profile/ProfileShareButton";
 
 export const runtime = "nodejs";
 
@@ -75,13 +76,17 @@ export default async function PublicProfilePage({
   return (
     <main className="grid min-h-[100dvh] place-items-center px-4 py-10">
       <div className="w-full max-w-lg">
-        <div className="mb-4 flex items-center justify-between font-mono text-xs text-fg-dim">
-          <Link href="/" className="hover:text-accent">
-            ← klebold.xyz
+        <div className="mb-4 flex items-center justify-between font-mono text-xs">
+          <Link href="/" className="text-fg-dim hover:text-accent">
+            <span className="text-accent">$</span> klebold.xyz
           </Link>
-          {isMe && (
-            <Link href="/dashboard/settings" className="hover:text-accent">
+          {isMe ? (
+            <Link href="/dashboard/settings" className="text-fg-dim hover:text-accent">
               edit profile →
+            </Link>
+          ) : (
+            <Link href="/" className="text-fg-dim hover:text-accent">
+              join →
             </Link>
           )}
         </div>
@@ -100,6 +105,8 @@ export default async function PublicProfilePage({
               <p className="mt-0.5 text-xs text-fg-dim">member since {fmtDate(user.createdAt)}</p>
             </div>
           </div>
+
+          <ProfileShareButton username={user.username!} />
 
           {/* статы */}
           <div className="mt-6 grid grid-cols-3 gap-2 text-center font-mono">

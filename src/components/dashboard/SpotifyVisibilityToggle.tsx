@@ -47,13 +47,13 @@ export default function SpotifyVisibilityToggle({
         role="switch"
         aria-checked={enabled}
         aria-label="toggle now playing on public profile"
-        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-40 ${
+        className={`inline-flex h-6 w-11 shrink-0 items-center rounded-full px-0.5 transition-colors disabled:opacity-40 ${
           enabled ? "bg-accent" : "bg-white/15"
         }`}
       >
         <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-bg transition-transform ${
-            enabled ? "translate-x-[1.375rem]" : "translate-x-0.5"
+          className={`h-5 w-5 rounded-full bg-bg transition-transform duration-200 ${
+            enabled ? "translate-x-5" : "translate-x-0"
           }`}
         />
       </button>
