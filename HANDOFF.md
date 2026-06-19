@@ -167,6 +167,16 @@ email НЕ хардкодим — репо публичное). Раздел `/d
 **Безопасность:** CSP + HSTS + X-Frame/nosniff/COOP, rate-limiting, argon2, шифрование Spotify-токенов,
 проверка участия в чатах, секреты только в .env. Контейнер от непривилегированного юзера.
 
+**Пентест-аудит (2026-06-19, коммит `b3e0da9`):** закрыто — брутфорс входа (rate-limit по IP+email в
+`authorize()`), IP-спуфинг через X-Forwarded-For (`clientIp` теперь берёт `x-real-ip` от nginx),
+timing-энумерация аккаунтов (фиктивный argon2.verify), анти-флуд событий игры, nodemailer→9.0.1.
+Проверено чисто: authz/IDOR чата и admin (иерархия ролей), инъекции (Prisma + параметризованный pg),
+XSS (React-эскейп), CSRF Spotify (state в httpOnly-cookie), хеш/шифр токенов.
+**Остаточные рекомендации (не сделано):** обновить Next 14.2.35 → 15.x (часть CVE next/postcss/cookie
+закрывается только мажором; в нашей конфигурации большинство не применимо — нет next/image remote,
+CSP-nonce, rewrites/i18n; WS идёт через nginx, не через Next). Опц.: nonce-CSP вместо `unsafe-inline`
+для theme-скрипта; харднинг VPS (fail2ban/ufw/ssh-key-only — см. роадмап п.6).
+
 ---
 
 ## Ключевые решения и подводные камни
