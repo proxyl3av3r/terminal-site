@@ -49,10 +49,10 @@ export async function generateMetadata({
   params: { username: string };
 }): Promise<Metadata> {
   const data = await getProfile(params.username);
-  if (!data) return { title: "user not found · klebold.xyz" };
+  if (!data) return { title: "user not found · bash-app.com" };
   return {
-    title: `@${data.user.username} · klebold.xyz`,
-    description: `@${data.user.username} — ${data.user.points} pts · #${data.rank} on klebold.xyz`,
+    title: `@${data.user.username} · bash-app.com`,
+    description: `@${data.user.username} — ${data.user.points} pts · #${data.rank} on bash-app.com`,
   };
 }
 
@@ -78,7 +78,7 @@ export default async function PublicProfilePage({
       <div className="w-full max-w-lg">
         <div className="mb-4 flex items-center justify-between font-mono text-xs">
           <Link href="/" className="text-fg-dim hover:text-accent">
-            <span className="text-accent">$</span> klebold.xyz
+            <span className="text-accent">$</span> bash-app.com
           </Link>
           {isMe ? (
             <Link href="/dashboard/settings" className="text-fg-dim hover:text-accent">

@@ -24,7 +24,7 @@ export const BADGES: Record<string, BadgeDef> = {
     color: "#39ff14",
     points: 0,
     kind: "manual",
-    desc: "core developer of klebold.xyz",
+    desc: "core developer of bash-app.com",
   },
   "first-member": {
     key: "first-member",

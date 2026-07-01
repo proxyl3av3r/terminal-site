@@ -40,7 +40,7 @@ export default function VerifyConfirm({ token, email }: { token: string; email: 
 
   return (
     <div className="rounded-lg border border-white/10 bg-bg-soft/50 p-6 font-mono">
-      <div className="mb-4 text-sm text-accent">klebold.xyz :: auth</div>
+      <div className="mb-4 text-sm text-accent">bash-app.com :: auth</div>
       <div className="text-sm">
         <span className="text-accent">$</span> verify --email
       </div>

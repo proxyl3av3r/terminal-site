@@ -40,7 +40,7 @@ export default function ProfileShareButton({ username }: { username: string }) {
             sel?.addRange(r);
           }}
         >
-          {`https://klebold.xyz/u/${username}`}
+          {`${window.location.origin}/u/${username}`}
         </p>
       )}
     </div>

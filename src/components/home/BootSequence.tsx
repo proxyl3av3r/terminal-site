@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 // Фейковая загрузка системы при первом визите (один раз — флаг в localStorage).
 // Пропускается по клику/клавише и при prefers-reduced-motion.
 const STEPS = [
-  "booting klebold.xyz …",
+  "booting bash-app.com …",
   "[  OK  ] mounting /dev/self",
   "[  OK  ] starting display manager",
   "[  OK  ] loading matrix renderer",

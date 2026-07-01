@@ -34,7 +34,7 @@ export default function MobileNav({
         <Avatar config={avatar} size={32} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm text-fg">
-            {username ? `@${username}` : "klebold.xyz"}
+            {username ? `@${username}` : "bash-app.com"}
           </div>
           {shortId && (
             <div className="font-mono text-[11px] text-fg-dim">#{shortId}</div>

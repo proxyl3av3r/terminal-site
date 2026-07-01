@@ -20,7 +20,7 @@ const CONTENT = {
     "infra    docker · postgres · nginx · linux",
   ],
   // Приватность: личный email тут не показываем. Хочешь связь — заведи
-  // отдельный публичный адрес (напр. hi@klebold.xyz) и впиши сюда.
+  // отдельный публичный адрес (напр. hi@bash-app.com) и впиши сюда.
   contact: [
     { text: "no public inbox yet. find me through `social`." },
   ],
@@ -31,10 +31,10 @@ const CONTENT = {
 
 type Line = { text: string; tone?: string; href?: string };
 
-const PROMPT = "guest@klebold.xyz:~$";
+const PROMPT = "guest@bash-app.com:~$";
 
 const BANNER: Line[] = [
-  { text: "klebold.xyz — interactive shell", tone: "text-accent" },
+  { text: "bash-app.com — interactive shell", tone: "text-accent" },
   { text: "type `help` to list commands. try `neofetch`, `theme amber`, `matrix`.", tone: "text-fg-dim" },
 ];
 
@@ -178,7 +178,7 @@ export default function PublicCLI({
       case "neofetch":
         push(NEOFETCH, "text-accent");
         pushLines([
-          { text: "host      klebold.xyz" },
+          { text: "host      bash-app.com" },
           { text: "os        terminal-os (web)" },
           { text: "shell     guest-sh 1.0" },
           { text: "theme     " + (document.documentElement.dataset.theme ?? "green") },

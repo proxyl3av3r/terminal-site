@@ -39,7 +39,7 @@ function getTransporter(): nodemailer.Transporter {
 
 const SITE = () => process.env.SITE_NAME ?? "terminal-site";
 
-// Адрес отправителя. Для Resend — verified-домен, напр. noreply@klebold.xyz.
+// Адрес отправителя. Для Resend — verified-домен, напр. noreply@send.bash-app.com.
 const FROM = () =>
   process.env.EMAIL_FROM ?? `${SITE()} <${process.env.SMTP_USER}>`;
 

@@ -79,7 +79,7 @@ export default function HomeClient({ verified }: { verified?: string }) {
       <main className="relative z-10 flex min-h-screen flex-col justify-center px-6 py-16 sm:px-12 lg:px-24">
         <div ref={heroRef} className="max-w-2xl transition-transform duration-200 ease-out">
           <p className="mb-4 text-xs uppercase tracking-[0.3em] text-fg-dim">
-            klebold.xyz
+            bash-app.com
           </p>
 
           <HeroTypewriter

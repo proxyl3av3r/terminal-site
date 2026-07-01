@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Socket.IO realtime-сервис для чата klebold.xyz (онлайн-статус, typing, мгновенная доставка). Отдельный контейнер за Nginx.",
+  "description": "Socket.IO realtime-сервис для чата bash-app.com (онлайн-статус, typing, мгновенная доставка). Отдельный контейнер за Nginx.",
   "scripts": {
     "start": "node server.mjs"
   },

@@ -9,7 +9,7 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "klebold.xyz",
+  title: "bash-app.com",
   description: "personal terminal",
 };
 

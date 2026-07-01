@@ -6,7 +6,7 @@ export const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 // Зарезервированные ники (системные/опасные).
 const RESERVED = new Set([
   "admin", "root", "system", "klebold", "moderator", "support", "null",
-  "undefined", "me", "you", "guest",
+  "undefined", "me", "you", "guest", "bash", "bashapp", "bash_app",
 ]);
 
 export function normalizeUsername(raw: string): string {
