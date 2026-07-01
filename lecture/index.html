@@ -97,7 +97,7 @@
   .pill b{color:var(--accent)}
 
   /* матрица на титуле */
-  #matrix{position:fixed;inset:0;z-index:0;opacity:.32}
+  #matrix{position:fixed;inset:0;z-index:0;opacity:.14}
   .slide{z-index:1}
 
   /* спец-компоненты объявлены в своих слайдах ниже */
@@ -148,7 +148,7 @@
 <body>
 <canvas id="matrix"></canvas>
 <div id="bar"></div>
-<div id="hint"><kbd>←</kbd> <kbd>→</kbd> гортати · <kbd>F</kbd> повний екран</div>
+<div id="hint"><kbd>←</kbd> <kbd>→</kbd> гортати · <kbd>ПРОБІЛ</kbd> далі</div>
 <div id="hud">
   <button id="prev" aria-label="назад">←</button>
   <span id="count">01 / 15</span>
@@ -163,7 +163,7 @@
       <div class="reveal r1 kicker">bash-app.com <span class="accent">::</span> lecture // live</div>
       <h1 class="reveal r2">Захист цифрової<br>інфраструктури</h1>
       <p class="reveal r3 lead big">Практичні налаштування для запобігання <b class="accent">несанкціонованому доступу</b> та <b class="amber">витоку інформації</b>.</p>
-      <p class="reveal r4 muted">Розбираємо на живій системі — реальні конфіги, реальні атаки, реальні захисти. <span class="dim">~30–40 хв, з інтерактивом.</span></p>
+      <p class="reveal r4 muted">Розбираємо на живій системі — реальні конфіги, реальні атаки, реальні захисти.</p>
       <p class="reveal r5" style="margin-top:26px">
         <span class="accent">guest@bash-app.com</span>:~$ <span id="bootline"></span><span class="cursor"></span>
       </p>
@@ -272,26 +272,42 @@ Strict-Transport-Security: max-age=63072000;
     <div class="wrap">
       <div class="reveal r1 kicker">05 <span class="accent">/</span> демо · clickjacking</div>
       <h2 class="reveal r1">«Натисни на приз» — а насправді…</h2>
-      <p class="reveal r2 muted">Зловмисник кладе прозорий iframe вашого сайту поверх принади. Клік потрапляє не туди, куди думає жертва.</p>
-      <div class="reveal r3 grid g2" style="margin-top:14px;align-items:start">
-        <div class="card center" style="position:relative;overflow:hidden;min-height:190px">
-          <div style="font-size:1.4em;margin:22px 0 6px">🎁 <b>Ви виграли!</b></div>
-          <div class="dim small">Натисніть кнопку, щоб забрати приз</div>
-          <button class="btn" style="margin-top:16px" id="cjBtn">ЗАБРАТИ ПРИЗ</button>
-          <div id="cjFrame" style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,rgba(255,77,77,.12) 0 10px,transparent 10px 20px);border:2px dashed var(--red);display:flex;align-items:center;justify-content:center;color:var(--red);font-size:.8em">
-            прихований iframe:<br>«Переказати 1000₴ →»
+      <p class="reveal r2 muted">Зловмисник кладе <b>прозорий</b> iframe справжнього сайту поверх принади. Перетягни повзунок — і побачиш, що насправді під пальцем жертви.</p>
+      <div class="reveal r3 grid g2" style="margin-top:12px;align-items:start">
+        <div class="card">
+          <div class="small dim" style="margin-bottom:8px">👁 Сторінка-принада зловмисника:</div>
+          <div id="cjStage" style="position:relative;height:196px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#0c0c0c">
+            <!-- принада: те, що ДУМАЄ жертва -->
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+              <div style="font-size:1.4em;margin-bottom:4px">🎁 <b>Ви виграли iPhone!</b></div>
+              <div class="dim small">натисніть, щоб забрати</div>
+              <button class="btn" style="margin-top:12px">ЗАБРАТИ ПРИЗ</button>
+            </div>
+            <!-- невидимий iframe банку: те, що НАСПРАВДІ ловить клік -->
+            <div id="cjOverlay" style="position:absolute;inset:0;background:#0d1622;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;opacity:0;transition:opacity .12s">
+              <div class="small dim">🏦 bank.example / переказ</div>
+              <div style="margin:6px 0" class="amber">Підтвердити переказ <b>1000&nbsp;₴</b>?</div>
+              <button class="btn" style="background:var(--red);color:#fff;margin-top:6px">ПІДТВЕРДИТИ →</button>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
+            <span class="small dim" style="white-space:nowrap">прозорість шару</span>
+            <input type="range" id="cjOpacity" min="0" max="100" value="0" style="flex:1;accent-color:var(--accent)">
+            <span class="small accent" id="cjOpVal" style="min-width:40px;text-align:right">0%</span>
           </div>
         </div>
         <div class="card">
-          <h3><span class="ico">⚙</span> Захист</h3>
+          <h3><span class="ico">⚙</span> Як працює / як гасимо</h3>
+          <ol class="small" style="padding-left:18px;line-height:1.65;margin:0 0 12px">
+            <li>Атакуючий вбудовує <b>справжній</b> банк у прозорий <code>&lt;iframe&gt;</code></li>
+            <li>Малює зверху принаду; кнопки суміщені <b>піксель-у-піксель</b></li>
+            <li>Жертва «тисне приз» — а клік іде в невидимий банк → переказ</li>
+          </ol>
           <div class="toggle" id="cjToggle">
             <button data-m="off" class="on">без захисту</button>
             <button data-m="on">X-Frame-Options: DENY</button>
           </div>
           <div id="cjResult" class="small" style="margin-top:8px"></div>
-<pre style="margin-top:12px">X-Frame-Options: DENY
-<span class="c"># або в CSP:</span>
-Content-Security-Policy: frame-ancestors 'none'</pre>
         </div>
       </div>
     </div>
@@ -545,9 +561,7 @@ a confirmation email has been sent.</pre>
     if(['ArrowRight','PageDown',' ','Enter'].includes(e.key)){ e.preventDefault(); next(); }
     else if(['ArrowLeft','PageUp'].includes(e.key)){ e.preventDefault(); prev(); }
     else if(e.key==='Home'){ go(0); } else if(e.key==='End'){ go(total-1); }
-    else if(e.key==='f'||e.key==='F'){ toggleFs(); }
   });
-  function toggleFs(){ if(!document.fullscreenElement){ (document.documentElement.requestFullscreen||function(){})(); } else { document.exitFullscreen(); } }
   // свайпы
   var tx=0,ty=0;
   window.addEventListener('touchstart',function(e){tx=e.touches[0].clientX;ty=e.touches[0].clientY;},{passive:true});
@@ -564,15 +578,19 @@ a confirmation email has been sent.</pre>
   var cols, drops, fontSize=16, chars='01<>/{}[]#$%*+=абвгдabcdef01'.split('');
   function sizeM(){ mc.width=innerWidth; mc.height=innerHeight; cols=Math.floor(mc.width/fontSize); drops=[]; for(var c=0;c<cols;c++)drops[c]=Math.random()*mc.height/fontSize; }
   sizeM(); addEventListener('resize',sizeM);
+  var mframe=0;
   function drawM(){
     if(i!==0){ requestAnimationFrame(drawM); return; }
-    mx.fillStyle='rgba(10,10,10,.08)'; mx.fillRect(0,0,mc.width,mc.height);
-    mx.fillStyle='#39ff14'; mx.font=fontSize+'px monospace';
-    for(var c=0;c<cols;c++){
-      var ch=chars[Math.floor(Math.random()*chars.length)];
-      mx.fillText(ch,c*fontSize,drops[c]*fontSize);
-      if(drops[c]*fontSize>mc.height && Math.random()>.975) drops[c]=0;
-      drops[c]+=0.5;
+    // малюємо не щокадру — спокійніший, повільніший «дощ»
+    if((mframe++ % 3)===0){
+      mx.fillStyle='rgba(10,10,10,.10)'; mx.fillRect(0,0,mc.width,mc.height);
+      mx.fillStyle='#2c9b13'; mx.font=fontSize+'px monospace';
+      for(var c=0;c<cols;c++){
+        var ch=chars[Math.floor(Math.random()*chars.length)];
+        mx.fillText(ch,c*fontSize,drops[c]*fontSize);
+        if(drops[c]*fontSize>mc.height && Math.random()>.99) drops[c]=0;
+        drops[c]+=0.5;
+      }
     }
     requestAnimationFrame(drawM);
   }
@@ -602,12 +620,29 @@ a confirmation email has been sent.</pre>
   }
   bindToggle('tlsToggle',tlsRender,'off');
 
-  // ── слайд 5: clickjacking ──
-  var cjFrame=document.getElementById('cjFrame'), cjRes=document.getElementById('cjResult');
-  document.getElementById('cjBtn').addEventListener('click',function(){ /* нижче перекриється */ });
+  // ── слайд 4: розкриття пояснень до заголовків по кліку ──
+  document.querySelectorAll('#hdrs .hdrline').forEach(function(h){
+    h.addEventListener('click',function(){ h.classList.toggle('open'); });
+  });
+
+  // ── слайд 5: clickjacking (повзунок прозорості + захист) ──
+  var cjOverlay=document.getElementById('cjOverlay'), cjOp=document.getElementById('cjOpacity'),
+      cjOpVal=document.getElementById('cjOpVal'), cjRes=document.getElementById('cjResult'), cjBlocked=false;
+  function cjUpd(){
+    cjOverlay.style.opacity = cjBlocked ? 0 : (cjOp.value/100);
+    cjOpVal.textContent = cjOp.value+'%';
+  }
+  cjOp.addEventListener('input',cjUpd);
   function cjRender(m){
-    if(m==='off'){ cjFrame.style.display='flex'; cjRes.innerHTML='<span class="bad">✗ клік «Забрати приз» іде у прихований iframe → переказ коштів.</span>'; }
-    else { cjFrame.style.display='none'; cjRes.innerHTML='<span class="ok">✓ браузер відмовився вбудовувати сайт в iframe. Атака неможлива.</span>'; }
+    cjBlocked = (m==='on');
+    if(cjBlocked){
+      cjOp.disabled=true;
+      cjRes.innerHTML='<span class="ok">✓ браузер відмовився вбудовувати банк в iframe — накладати нічого. Клік іде туди, куди бачить жертва.</span>';
+    } else {
+      cjOp.disabled=false;
+      cjRes.innerHTML='<span class="bad">✗ шар існує, але невидимий (0%). Клік «Забрати приз» насправді підтверджує переказ.</span>';
+    }
+    cjUpd();
   }
   bindToggle('cjToggle',cjRender,'off');
 
