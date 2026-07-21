@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
 import { getNowPlaying, spotifyConfigured } from "@/lib/spotify";
+import { errText } from "@/lib/log";
 
 export const runtime = "nodejs";
 
@@ -44,7 +45,7 @@ export async function GET() {
     cache.set(uid, { ts: Date.now(), data });
     return NextResponse.json(data);
   } catch (err) {
-    console.error("now-playing failed:", err);
+    console.error("now-playing failed:", errText(err));
     return NextResponse.json({ ok: true, connected: true, isPlaying: false });
   }
 }

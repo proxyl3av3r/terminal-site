@@ -4,6 +4,10 @@
 export const dayNum = (d: Date): number =>
   Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 86_400_000);
 
+// Начало текущих UTC-суток — граница для атомарной проверки «уже забирал сегодня».
+export const startOfUtcDay = (d: Date): Date =>
+  new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+
 // Награда за день стрика: 10 в первый день, +5 за каждый следующий, потолок 50.
 export const claimReward = (streak: number): number => Math.min(10 + (streak - 1) * 5, 50);
 

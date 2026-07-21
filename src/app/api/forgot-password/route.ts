@@ -8,6 +8,7 @@ import {
   RESET_PREFIX,
 } from "@/lib/tokens";
 import { sendPasswordResetEmail } from "@/lib/email";
+import { errText } from "@/lib/log";
 
 export const runtime = "nodejs";
 
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
   try {
     await sendPasswordResetEmail(email, resetUrl);
   } catch (err) {
-    console.error("sendPasswordResetEmail failed:", err);
+    console.error("sendPasswordResetEmail failed:", errText(err));
     await db.verificationToken.deleteMany({ where: { identifier } });
     return NextResponse.json(
       { ok: false, error: "Could not send the email. Check the mail settings." },

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { rateLimit, clientIp } from "@/lib/ratelimit";
 import { createVerificationToken, VERIFICATION_TTL_MS } from "@/lib/tokens";
 import { sendVerificationEmail } from "@/lib/email";
+import { errText } from "@/lib/log";
 
 export const runtime = "nodejs"; // argon2 — нативный модуль, нужен Node-рантайм
 
@@ -81,7 +82,7 @@ export async function POST(req: Request) {
     await sendVerificationEmail(email, verifyUrl);
   } catch (err) {
     // Если SMTP не настроен/упал — откатываем токен, сообщаем честно.
-    console.error("sendVerificationEmail failed:", err);
+    console.error("sendVerificationEmail failed:", errText(err));
     await db.verificationToken.deleteMany({ where: { identifier: email } });
     return NextResponse.json(
       { ok: false, error: "Could not send the email. Check the mail settings." },

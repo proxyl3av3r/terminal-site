@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { dayNum, claimReward } from "@/lib/daily";
+import { dayNum, claimReward, startOfUtcDay } from "@/lib/daily";
 
 export const runtime = "nodejs";
 
@@ -28,16 +28,31 @@ export async function POST() {
   const streak = last === today - 1 ? me.streak + 1 : 1;
   const reward = claimReward(streak);
 
-  const updated = await db.user.update({
-    where: { id: session.user.id },
+  // Атомарная защита от гонки (double-spend): начисляем ТОЛЬКО если в БД
+  // lastClaimAt всё ещё до начала сегодняшних суток (или null). Параллельные
+  // запросы сериализуются на блокировке строки — выигрывает ровно один,
+  // остальные получают count === 0.
+  const res = await db.user.updateMany({
+    where: {
+      id: session.user.id,
+      OR: [{ lastClaimAt: null }, { lastClaimAt: { lt: startOfUtcDay(now) } }],
+    },
     data: { points: { increment: reward }, streak, lastClaimAt: now },
+  });
+
+  if (res.count === 0) {
+    return NextResponse.json({ ok: false, error: "already claimed today" }, { status: 409 });
+  }
+
+  const updated = await db.user.findUnique({
+    where: { id: session.user.id },
     select: { points: true, streak: true },
   });
 
   return NextResponse.json({
     ok: true,
     reward,
-    points: updated.points,
-    streak: updated.streak,
+    points: updated?.points ?? me.points + reward,
+    streak: updated?.streak ?? streak,
   });
 }

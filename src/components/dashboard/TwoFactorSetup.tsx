@@ -58,8 +58,11 @@ export default function TwoFactorSetup({ initialEnabled }: { initialEnabled: boo
   }
 
   async function regenerate() {
-    const data = await post("/api/backup-codes");
-    if (data) setBackupCodes(data.backupCodes);
+    const data = await post("/api/backup-codes", { code });
+    if (data) {
+      setBackupCodes(data.backupCodes);
+      setCode("");
+    }
   }
 
   async function disable() {
@@ -163,35 +166,34 @@ export default function TwoFactorSetup({ initialEnabled }: { initialEnabled: boo
             </div>
           )}
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={regenerate}
-              disabled={busy}
-              className="rounded border border-white/15 px-3 py-1.5 font-mono text-xs text-fg-dim hover:text-fg disabled:opacity-50"
-            >
-              regenerate backup codes
-            </button>
-          </div>
-
+          {/* Одно поле кода на оба действия: перевыпуск backup-кодов и
+              отключение 2FA — оба требуют действующий TOTP-код. */}
           <div className="border-t border-white/10 pt-4">
             <p className="mb-2 text-xs text-fg-dim">
-              disable 2FA (current code required):
+              enter your current 2FA code to manage:
             </p>
-            <div className="flex gap-2">
-              <input
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                inputMode="numeric"
-                maxLength={6}
-                placeholder="000000"
-                className="w-32 rounded border border-white/10 bg-black/40 px-3 py-2 font-mono tracking-widest text-fg outline-none focus:border-danger"
-              />
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="000000"
+              className="w-32 rounded border border-white/10 bg-black/40 px-3 py-2 font-mono tracking-widest text-fg outline-none focus:border-accent"
+            />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={regenerate}
+                disabled={busy || code.length < 6}
+                className="rounded border border-white/15 px-3 py-1.5 font-mono text-xs text-fg-dim hover:text-fg disabled:opacity-50"
+              >
+                regenerate backup codes
+              </button>
               <button
                 onClick={disable}
                 disabled={busy || code.length < 6}
-                className="rounded border border-danger/40 px-4 py-2 font-mono text-sm text-danger hover:bg-danger/10 disabled:opacity-50"
+                className="rounded border border-danger/40 px-4 py-1.5 font-mono text-xs text-danger hover:bg-danger/10 disabled:opacity-50"
               >
-                disable
+                disable 2FA
               </button>
             </div>
           </div>
