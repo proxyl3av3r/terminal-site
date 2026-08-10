@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import MatrixRain from "@/components/canvas/MatrixRain";
+import SpaceBackdrop from "@/components/home/SpaceBackdrop";
 import HeroTypewriter from "@/components/home/HeroTypewriter";
 import SecretTrigger from "@/components/home/SecretTrigger";
 import PublicCLI from "@/components/home/PublicCLI";
@@ -74,6 +75,7 @@ export default function HomeClient({ verified }: { verified?: string }) {
 
   return (
     <>
+      <SpaceBackdrop />
       <MatrixRain />
 
       <main className="relative z-10 flex min-h-screen flex-col justify-center px-6 py-16 sm:px-12 lg:px-24">

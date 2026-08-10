@@ -56,6 +56,8 @@ services:
       REALTIME_SECRET: ${REALTIME_SECRET}
       # Email'ы супер-админов (через запятую) — доступ к /dashboard/admin.
       SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS}
+      # NASA APOD (фон главной) — опционально; пусто → DEMO_KEY.
+      NASA_API_KEY: ${NASA_API_KEY:-}
     depends_on:
       migrate:
         condition: service_completed_successfully
