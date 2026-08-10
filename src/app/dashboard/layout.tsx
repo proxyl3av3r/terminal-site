@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import Sidebar from "@/components/dashboard/Sidebar";
 import MobileNav from "@/components/dashboard/MobileNav";
 import DashTerminal from "@/components/dashboard/DashTerminal";
+import MusicPlayer from "@/components/dashboard/MusicPlayer";
 import { parseAvatar } from "@/lib/avatar";
 import { isSuperAdmin } from "@/lib/admin";
 
@@ -58,6 +59,7 @@ export default async function DashboardLayout({
         shortId={user?.shortId ?? null}
         points={user?.points ?? 0}
       />
+      <MusicPlayer />
     </div>
   );
 }

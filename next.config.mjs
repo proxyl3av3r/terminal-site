@@ -18,6 +18,9 @@ const nextConfig = {
       "img-src 'self' data: blob: https://i.scdn.co",
       "font-src 'self' data:",
       "connect-src 'self'",
+      // Аудио (радио/Audius) стримится с внешних https-хостов через <audio>.
+      // Точечное послабление ТОЛЬКО для медиа — скрипты/connect остаются строгими.
+      "media-src 'self' https:",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
