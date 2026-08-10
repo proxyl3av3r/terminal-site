@@ -2,12 +2,14 @@ import Link from "next/link";
 import OnlineCount from "@/components/dashboard/OnlineCount";
 import Equalizer from "@/components/dashboard/Equalizer";
 import DailyClaim from "@/components/dashboard/DailyClaim";
+import ActivityHeatmap from "@/components/dashboard/ActivityHeatmap";
 import Badges from "@/components/badges/Badges";
 import Avatar from "@/components/avatar/Avatar";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { parseAvatar } from "@/lib/avatar";
 import { canClaim } from "@/lib/daily";
+import { activityMap } from "@/lib/activity";
 
 // Главный экран панели — живые виджеты + ссылки на инструменты.
 export default async function DashboardPage() {
@@ -23,6 +25,8 @@ export default async function DashboardPage() {
         },
       })
     : null;
+
+  const heat = session?.user?.id ? await activityMap(session.user.id) : null;
 
   // Топ-10 по баллам (только публичные — с ником).
   const top = await db.user.findMany({
@@ -76,6 +80,8 @@ export default async function DashboardPage() {
       )}
 
       {me && <DailyClaim claimable={canClaim(me.lastClaimAt)} streak={me.streak} />}
+
+      {me && heat && <ActivityHeatmap data={heat} streak={me.streak} />}
 
       <Equalizer />
 

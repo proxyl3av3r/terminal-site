@@ -6,6 +6,7 @@ import { rateLimit, clientIp } from "@/lib/ratelimit";
 import { isMember, getMembership, canPost, MAX_TEXT, MAX_ASCII } from "@/lib/chat";
 import { notifyRealtime, convRoom, userRoom } from "@/lib/realtime";
 import { awardBadgeSafe } from "@/lib/award";
+import { bumpActivity } from "@/lib/activity";
 
 export const runtime = "nodejs";
 
@@ -143,5 +144,6 @@ export async function POST(
   );
 
   awardBadgeSafe(session.user.id, "first-message");
+  void bumpActivity(session.user.id);
   return NextResponse.json({ ok: true, message: msg });
 }

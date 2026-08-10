@@ -11,6 +11,8 @@ import { BADGES, sortBadgeKeys } from "@/lib/badges";
 import Avatar from "@/components/avatar/Avatar";
 import PublicNowPlaying from "@/components/profile/PublicNowPlaying";
 import ProfileShareButton from "@/components/profile/ProfileShareButton";
+import ActivityHeatmap from "@/components/dashboard/ActivityHeatmap";
+import { activityMap } from "@/lib/activity";
 
 export const runtime = "nodejs";
 
@@ -40,7 +42,8 @@ const getProfile = cache(async function getProfile(usernameParam: string) {
     (await db.user.count({
       where: { username: { not: null }, points: { gt: user.points } },
     })) + 1;
-  return { user, rank };
+  const heat = await activityMap(user.id);
+  return { user, rank, heat };
 });
 
 export async function generateMetadata({
@@ -66,7 +69,7 @@ export default async function PublicProfilePage({
 }) {
   const data = await getProfile(params.username);
   if (!data) notFound();
-  const { user, rank } = data;
+  const { user, rank, heat } = data;
 
   const session = await auth();
   const isMe = session?.user?.id === user.id;
@@ -122,6 +125,11 @@ export default async function PublicProfilePage({
               <div className="text-xl text-accent">{user.streak}🔥</div>
               <div className="text-[11px] text-fg-dim">streak</div>
             </div>
+          </div>
+
+          {/* граф активности (публичный — шарится вместе с профилем) */}
+          <div className="mt-6">
+            <ActivityHeatmap data={heat} streak={user.streak} title="activity" />
           </div>
 
           {/* значки */}

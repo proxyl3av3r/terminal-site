@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { dayNum, claimReward, startOfUtcDay } from "@/lib/daily";
+import { bumpActivity } from "@/lib/activity";
 
 export const runtime = "nodejs";
 
@@ -43,6 +44,8 @@ export async function POST() {
   if (res.count === 0) {
     return NextResponse.json({ ok: false, error: "already claimed today" }, { status: 409 });
   }
+
+  void bumpActivity(session.user.id, now);
 
   const updated = await db.user.findUnique({
     where: { id: session.user.id },

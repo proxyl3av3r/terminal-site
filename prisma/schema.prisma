@@ -61,8 +61,24 @@ model User {
   messages            Message[]
   reactions           MessageReaction[]
   badges              UserBadge[]
+  activityDays        ActivityDay[]
 
   @@map("users")
+}
+
+// Ежедневная активность для графа-хитмапа. day = номер UTC-суток (dayNum из
+// lib/daily.ts), count — сколько «действий» в этот день (claim, сообщение и т.п.).
+// Уникальность (userId,day) делает инкремент идемпотентным через upsert.
+model ActivityDay {
+  id     String @id @default(cuid())
+  userId String
+  day    Int
+  count  Int    @default(0)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, day])
+  @@index([userId])
+  @@map("activity_days")
 }
 
 // Значки/ачивки пользователя. key — из реестра src/lib/badges.ts.
