@@ -62,6 +62,7 @@ model User {
   reactions           MessageReaction[]
   badges              UserBadge[]
   activityDays        ActivityDay[]
+  triviaResults       TriviaResult[]
 
   @@map("users")
 }
@@ -79,6 +80,31 @@ model ActivityDay {
   @@unique([userId, day])
   @@index([userId])
   @@map("activity_days")
+}
+
+// Набор вопросов дня (day = UTC dayNum). questions хранит и правильные ответы —
+// НИКОГДА не отдаётся клиенту целиком (сервер проверяет ответы сам).
+model TriviaDaily {
+  day       Int      @id
+  questions Json
+  createdAt DateTime @default(now())
+
+  @@map("trivia_daily")
+}
+
+// Результат игрока за день. Уникальность (userId,day) = анти-реплей: очки
+// начисляются ровно один раз.
+model TriviaResult {
+  id        String   @id @default(cuid())
+  userId    String
+  day       Int
+  score     Int
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, day])
+  @@index([userId])
+  @@map("trivia_results")
 }
 
 // Значки/ачивки пользователя. key — из реестра src/lib/badges.ts.

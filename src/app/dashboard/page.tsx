@@ -2,6 +2,7 @@ import Link from "next/link";
 import OnlineCount from "@/components/dashboard/OnlineCount";
 import Equalizer from "@/components/dashboard/Equalizer";
 import DailyClaim from "@/components/dashboard/DailyClaim";
+import DailyTrivia from "@/components/dashboard/DailyTrivia";
 import ActivityHeatmap from "@/components/dashboard/ActivityHeatmap";
 import Badges from "@/components/badges/Badges";
 import Avatar from "@/components/avatar/Avatar";
@@ -80,6 +81,8 @@ export default async function DashboardPage() {
       )}
 
       {me && <DailyClaim claimable={canClaim(me.lastClaimAt)} streak={me.streak} />}
+
+      {me && <DailyTrivia />}
 
       {me && heat && <ActivityHeatmap data={heat} streak={me.streak} />}
 
