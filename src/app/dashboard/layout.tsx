@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import Sidebar from "@/components/dashboard/Sidebar";
 import MobileNav from "@/components/dashboard/MobileNav";
+import DashTerminal from "@/components/dashboard/DashTerminal";
 import { parseAvatar } from "@/lib/avatar";
 import { isSuperAdmin } from "@/lib/admin";
 
@@ -19,7 +20,7 @@ export default async function DashboardLayout({
 
   const user = await db.user.findUnique({
     where: { id: session.user.id },
-    select: { email: true, username: true, shortId: true, avatar: true },
+    select: { email: true, username: true, shortId: true, avatar: true, points: true },
   });
   const avatarConfig = parseAvatar(user?.avatar ?? null, session.user.id);
   const admin = isSuperAdmin(user?.email);
@@ -52,6 +53,11 @@ export default async function DashboardLayout({
           {children}
         </div>
       </div>
+      <DashTerminal
+        username={user?.username ?? null}
+        shortId={user?.shortId ?? null}
+        points={user?.points ?? 0}
+      />
     </div>
   );
 }
