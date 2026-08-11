@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { BG_MODES, readBgMode } from "@/components/home/useBgMode";
 
 // ─────────────────────────────────────────────────────────────────────
 // РЕДАКТИРУЙ ЗДЕСЬ: содержимое команд about/projects/skills/contact/social.
@@ -144,6 +145,21 @@ export default function PublicCLI({
     push(`keyboard sound → ${arg}`, "text-accent");
   }
 
+  function setBg(mode?: string) {
+    if (!mode) {
+      push(`current: ${readBgMode()}. options: ${BG_MODES.join(" · ")}`, "text-fg-dim");
+      return;
+    }
+    if (!(BG_MODES as string[]).includes(mode)) {
+      push(`unknown mode: ${mode}. options: ${BG_MODES.join(" · ")}`, "text-danger");
+      return;
+    }
+    document.documentElement.dataset.bg = mode;
+    localStorage.setItem("bg", mode);
+    window.dispatchEvent(new CustomEvent("bg-change"));
+    push(`background → ${mode}`, "text-accent");
+  }
+
   function run(raw: string) {
     const input = raw.trim();
     push(`${PROMPT} ${input}`, "text-fg-dim");
@@ -165,6 +181,7 @@ export default function PublicCLI({
           { text: "neofetch   — system card" },
           { text: "theme      — green | amber | mono | ice" },
           { text: "sound      — on | off (keyboard clicks)" },
+          { text: "bg         — rain | space | both (background mode)" },
           { text: "matrix     — intensify the background" },
           { text: "login      — open the secure console" },
           { text: "clear      — clear the screen" },
@@ -188,6 +205,8 @@ export default function PublicCLI({
         break;
       case "theme": setTheme(arg || undefined); break;
       case "sound": setSound(arg || undefined); break;
+      case "bg":
+      case "background": setBg(arg || undefined); break;
       case "matrix":
         window.dispatchEvent(new CustomEvent("matrix-boost"));
         push("entering the matrix…", "text-accent");

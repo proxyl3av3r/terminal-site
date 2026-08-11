@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import MatrixRain from "@/components/canvas/MatrixRain";
 import SpaceBackdrop from "@/components/home/SpaceBackdrop";
+import { useBgMode } from "@/components/home/useBgMode";
 import HeroTypewriter from "@/components/home/HeroTypewriter";
 import SecretTrigger from "@/components/home/SecretTrigger";
 import PublicCLI from "@/components/home/PublicCLI";
@@ -21,6 +22,7 @@ type AuthCmd = "login" | "register" | "forgot";
 
 export default function HomeClient({ verified }: { verified?: string }) {
   const [booting, setBooting] = useState(true);
+  const bg = useBgMode();
   // Консоль открыта? + какой сценарий предзадан (undefined = меню: выбор команды).
   const [consoleOpen, setConsoleOpen] = useState(false);
   const [authCmd, setAuthCmd] = useState<AuthCmd | undefined>(undefined);
@@ -75,8 +77,8 @@ export default function HomeClient({ verified }: { verified?: string }) {
 
   return (
     <>
-      <SpaceBackdrop />
-      <MatrixRain />
+      {bg !== "rain" && <SpaceBackdrop solo={bg === "space"} />}
+      {bg !== "space" && <MatrixRain />}
 
       <main className="relative z-10 flex min-h-screen flex-col justify-center px-6 py-16 sm:px-12 lg:px-24">
         <div ref={heroRef} className="max-w-2xl transition-transform duration-200 ease-out">

@@ -3,7 +3,9 @@
 // затемнение/обесцвечивание + низкая непрозрачность → сквозь дождь проступают
 // лишь редкие «звёзды», без резкого контраста. Тема-нейтрально (работает на
 // всех темах). В видео-дни/при сбое /api/apod отдаёт 204 → слой пустой.
-export default function SpaceBackdrop() {
+export default function SpaceBackdrop({ solo = false }: { solo?: boolean }) {
+  // solo = режим «только космос» (без дождя): делаем ярче и цветнее — космос
+  // теперь главный элемент. В комбо с дождём — приглушённый фон.
   return (
     <div
       aria-hidden
@@ -12,11 +14,11 @@ export default function SpaceBackdrop() {
         backgroundImage: "url(/api/apod)",
         backgroundSize: "cover",
         backgroundPosition: "center",
-        // Тюнинг видимости: opacity — насколько заметно (0.15 еле-еле … 0.45 явно),
-        // brightness — насколько тёмный. Обычный blend поверх матрицы (не screen),
-        // слой на 30% полупрозрачный → сквозь него видно дождь.
-        filter: "grayscale(0.5) brightness(0.7) contrast(1.05)",
-        opacity: 0.3,
+        // Тюнинг видимости: opacity — насколько заметно, brightness — яркость.
+        filter: solo
+          ? "grayscale(0.15) brightness(0.9) contrast(1.05)"
+          : "grayscale(0.5) brightness(0.7) contrast(1.05)",
+        opacity: solo ? 0.6 : 0.3,
       }}
     />
   );
