@@ -39,11 +39,13 @@ async function getApod(): Promise<{ bytes: Uint8Array; type: string }> {
     Accept: "application/json",
   });
   const meta = await metaRes.json();
-  if (meta.media_type !== "image" || !meta.url) throw new Error("apod not an image today");
+  // hdurl — версия высокого разрешения (не растянутая на больших экранах);
+  // fallback на обычную url. Тянем раз в сутки → размер не критичен.
+  const imgUrl: string | undefined = meta.hdurl || meta.url;
+  if (meta.media_type !== "image" || !imgUrl) throw new Error("apod not an image today");
 
-  // url — стандартная версия (не hdurl: та бывает по 10+ МБ). Хост apod.nasa.gov
-  // отдельный от api.nasa.gov и иногда медленный — даём до 30с.
-  const imgRes = await stage("image", 30000, meta.url, UA);
+  // Хост apod.nasa.gov отдельный от api.nasa.gov и иногда медленный — даём до 30с.
+  const imgRes = await stage("image", 30000, imgUrl, UA);
   const bytes = new Uint8Array(await imgRes.arrayBuffer());
   cache = { day, bytes, type: imgRes.headers.get("content-type") ?? "image/jpeg" };
   return cache;

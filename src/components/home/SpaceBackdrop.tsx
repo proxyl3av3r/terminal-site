@@ -119,7 +119,7 @@ export default function SpaceBackdrop() {
       // параллакс базового слоя
       const px = mouse.x / window.innerWidth - 0.5;
       const py = mouse.y / window.innerHeight - 0.5;
-      if (imgRef.current) imgRef.current.style.transform = `scale(1.08) translate(${(-px * 18).toFixed(1)}px, ${(-py * 18).toFixed(1)}px)`;
+      if (imgRef.current) imgRef.current.style.transform = `scale(1.08) translate(${(-px * 9).toFixed(1)}px, ${(-py * 9).toFixed(1)}px)`;
       // позиция прожектора
       if (spotRef.current) {
         spotRef.current.style.setProperty("--mx", mouse.x + "px");
@@ -174,7 +174,7 @@ export default function SpaceBackdrop() {
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(circle 220px at var(--mx, 50%) var(--my, 50%), rgba(200,255,210,0.10), transparent 70%)",
+            "radial-gradient(circle 180px at var(--mx, 50%) var(--my, 50%), rgba(200,255,210,0.05), transparent 70%)",
           mixBlendMode: "screen",
         }}
       />
