@@ -181,7 +181,7 @@ export default function PublicCLI({
           { text: "neofetch   — system card" },
           { text: "theme      — green | amber | mono | ice" },
           { text: "sound      — on | off (keyboard clicks)" },
-          { text: "bg         — rain | space | both (background mode)" },
+          { text: "bg         — rain | space (background mode)" },
           { text: "matrix     — intensify the background" },
           { text: "login      — open the secure console" },
           { text: "clear      — clear the screen" },

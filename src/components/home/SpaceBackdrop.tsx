@@ -7,9 +7,9 @@ import { useEffect, useRef } from "react";
 //  2) прожектор: мягкая подсветка под курсором (screen-blend),
 //  3) созвездия: канвас с мерцающими звёздами; рядом с курсором они соединяются
 //     тонкими линиями и тянутся к нему.
-// Рендерится только в режимах space/both (см. HomeClient) → в «дожде» не грузит.
+// Рендерится только в режиме space (см. HomeClient) → в «дожде» не грузит.
 // Уважает prefers-reduced-motion: статичный кадр без анимации и параллакса.
-export default function SpaceBackdrop({ solo = false }: { solo?: boolean }) {
+export default function SpaceBackdrop() {
   const imgRef = useRef<HTMLDivElement>(null);
   const spotRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -150,7 +150,7 @@ export default function SpaceBackdrop({ solo = false }: { solo?: boolean }) {
       window.removeEventListener("resize", onResize);
       window.removeEventListener("theme-change", readAccent);
     };
-  }, [solo]);
+  }, []);
 
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 z-[1] overflow-hidden">
@@ -162,10 +162,8 @@ export default function SpaceBackdrop({ solo = false }: { solo?: boolean }) {
           backgroundImage: "url(/api/apod)",
           backgroundSize: "cover",
           backgroundPosition: "center",
-          filter: solo
-            ? "grayscale(0.15) brightness(0.9) contrast(1.05)"
-            : "grayscale(0.5) brightness(0.7) contrast(1.05)",
-          opacity: solo ? 0.6 : 0.3,
+          filter: "grayscale(0.15) brightness(0.9) contrast(1.05)",
+          opacity: 0.6,
           transform: "scale(1.08)",
           transition: "transform 0.25s ease-out",
         }}
