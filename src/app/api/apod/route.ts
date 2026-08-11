@@ -39,13 +39,28 @@ async function getApod(): Promise<{ bytes: Uint8Array; type: string }> {
     Accept: "application/json",
   });
   const meta = await metaRes.json();
-  // hdurl — версия высокого разрешения (не растянутая на больших экранах);
-  // fallback на обычную url. Тянем раз в сутки → размер не критичен.
-  const imgUrl: string | undefined = meta.hdurl || meta.url;
-  if (meta.media_type !== "image" || !imgUrl) throw new Error("apod not an image today");
+  if (meta.media_type !== "image" || !meta.url) throw new Error("apod not an image today");
 
-  // Хост apod.nasa.gov отдельный от api.nasa.gov и иногда медленный — даём до 30с.
-  const imgRes = await stage("image", 30000, imgUrl, UA);
+  // Берём hi-res (hdurl), но с подстраховкой: если он падает по таймауту ИЛИ
+  // слишком тяжёлый (панорамы бывают по 30+ МБ) — откатываемся на обычную url,
+  // чтобы фон не пропадал. Хост apod.nasa.gov отдельный и иногда медленный.
+  const hd: string | undefined = meta.hdurl;
+  const std: string = meta.url;
+
+  async function grab(url: string, label: string): Promise<Response> {
+    const res = await stage(label, 18000, url, UA);
+    const len = Number(res.headers.get("content-length") || "0");
+    if (len > 12_000_000) throw new Error(`${label} too large (${len})`);
+    return res;
+  }
+
+  let imgRes: Response;
+  try {
+    imgRes = hd ? await grab(hd, "image-hd") : await grab(std, "image-std");
+  } catch {
+    imgRes = await grab(std, "image-std"); // фолбэк на стандартное разрешение
+  }
+
   const bytes = new Uint8Array(await imgRes.arrayBuffer());
   cache = { day, bytes, type: imgRes.headers.get("content-type") ?? "image/jpeg" };
   return cache;
