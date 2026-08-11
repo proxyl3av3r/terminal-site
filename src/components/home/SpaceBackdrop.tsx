@@ -12,9 +12,11 @@ export default function SpaceBackdrop() {
         backgroundImage: "url(/api/apod)",
         backgroundSize: "cover",
         backgroundPosition: "center",
-        filter: "grayscale(0.85) brightness(0.42) contrast(1.05)",
-        opacity: 0.16,
-        mixBlendMode: "screen",
+        // Тюнинг видимости: opacity — насколько заметно (0.15 еле-еле … 0.45 явно),
+        // brightness — насколько тёмный. Обычный blend поверх матрицы (не screen),
+        // слой на 30% полупрозрачный → сквозь него видно дождь.
+        filter: "grayscale(0.5) brightness(0.7) contrast(1.05)",
+        opacity: 0.3,
       }}
     />
   );
