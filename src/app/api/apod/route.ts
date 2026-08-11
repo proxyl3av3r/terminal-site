@@ -10,24 +10,40 @@ export const dynamic = "force-dynamic";
 
 let cache: { day: number; bytes: Uint8Array; type: string } | null = null;
 
+const UA = { "User-Agent": "bash-app.com (+https://bash-app.com)" };
+
+// Запрос с таймаутом и меткой стадии (видно в логах, что именно тормозит).
+async function stage(label: string, ms: number, url: string, headers: Record<string, string>): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal, headers });
+    if (!res.ok) throw new Error(`${res.status}`);
+    return res;
+  } catch (e) {
+    throw new Error(`apod ${label}: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function getApod(): Promise<{ bytes: Uint8Array; type: string }> {
   const day = Math.floor(Date.now() / 86_400_000);
   if (cache && cache.day === day) return cache;
 
-  // UA обязателен: шлюз api.data.gov 403-ит запросы без него. Реальный ключ
-  // (NASA_API_KEY) снимает блок DEMO_KEY с дата-центровых IP.
+  // UA обязателен (иначе шлюз 403). Реальный NASA_API_KEY снимает блок DEMO_KEY
+  // с дата-центровых IP. Таймауты щедрые: тянем раз в сутки, VPS-канал общий.
   const key = process.env.NASA_API_KEY || "DEMO_KEY";
-  const ua = { "User-Agent": "bash-app.com (+https://bash-app.com)" };
-  const metaRes = await fetch(`https://api.nasa.gov/planetary/apod?api_key=${key}`, {
-    signal: AbortSignal.timeout(7000),
-    headers: { ...ua, Accept: "application/json" },
+  const metaRes = await stage("meta", 15000, `https://api.nasa.gov/planetary/apod?api_key=${key}`, {
+    ...UA,
+    Accept: "application/json",
   });
-  if (!metaRes.ok) throw new Error(`apod meta ${metaRes.status}`);
   const meta = await metaRes.json();
   if (meta.media_type !== "image" || !meta.url) throw new Error("apod not an image today");
 
-  const imgRes = await fetch(meta.url, { signal: AbortSignal.timeout(9000), headers: ua });
-  if (!imgRes.ok) throw new Error(`apod image ${imgRes.status}`);
+  // url — стандартная версия (не hdurl: та бывает по 10+ МБ). Хост apod.nasa.gov
+  // отдельный от api.nasa.gov и иногда медленный — даём до 30с.
+  const imgRes = await stage("image", 30000, meta.url, UA);
   const bytes = new Uint8Array(await imgRes.arrayBuffer());
   cache = { day, bytes, type: imgRes.headers.get("content-type") ?? "image/jpeg" };
   return cache;
