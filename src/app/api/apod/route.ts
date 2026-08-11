@@ -14,15 +14,19 @@ async function getApod(): Promise<{ bytes: Uint8Array; type: string }> {
   const day = Math.floor(Date.now() / 86_400_000);
   if (cache && cache.day === day) return cache;
 
-  const key = process.env.NASA_API_KEY ?? "DEMO_KEY";
+  // UA обязателен: шлюз api.data.gov 403-ит запросы без него. Реальный ключ
+  // (NASA_API_KEY) снимает блок DEMO_KEY с дата-центровых IP.
+  const key = process.env.NASA_API_KEY || "DEMO_KEY";
+  const ua = { "User-Agent": "bash-app.com (+https://bash-app.com)" };
   const metaRes = await fetch(`https://api.nasa.gov/planetary/apod?api_key=${key}`, {
     signal: AbortSignal.timeout(7000),
+    headers: { ...ua, Accept: "application/json" },
   });
   if (!metaRes.ok) throw new Error(`apod meta ${metaRes.status}`);
   const meta = await metaRes.json();
   if (meta.media_type !== "image" || !meta.url) throw new Error("apod not an image today");
 
-  const imgRes = await fetch(meta.url, { signal: AbortSignal.timeout(9000) });
+  const imgRes = await fetch(meta.url, { signal: AbortSignal.timeout(9000), headers: ua });
   if (!imgRes.ok) throw new Error(`apod image ${imgRes.status}`);
   const bytes = new Uint8Array(await imgRes.arrayBuffer());
   cache = { day, bytes, type: imgRes.headers.get("content-type") ?? "image/jpeg" };
