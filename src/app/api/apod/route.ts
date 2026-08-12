@@ -27,6 +27,30 @@ async function stage(label: string, ms: number, url: string, headers: Record<str
   }
 }
 
+// Метаданные APOD за конкретную дату (или сегодня, если date не задан).
+async function fetchMeta(key: string, date?: string): Promise<any> {
+  const url = `https://api.nasa.gov/planetary/apod?api_key=${key}${date ? `&date=${date}` : ""}`;
+  const res = await stage("meta", 15000, url, { ...UA, Accept: "application/json" });
+  return res.json();
+}
+
+// Ищем ДЕНЬ С КАРТИНКОЙ: сегодня, а если видео-день (media_type=video) — шагаем
+// назад до 6 дней к последнему снимку. Так фон есть всегда, даже когда у NASA видео.
+async function findImageMeta(key: string): Promise<any> {
+  const today = await fetchMeta(key);
+  if (today.media_type === "image" && today.url) return today;
+  for (let i = 1; i <= 6; i++) {
+    const d = new Date(Date.now() - i * 86_400_000).toISOString().slice(0, 10);
+    try {
+      const prev = await fetchMeta(key, d);
+      if (prev.media_type === "image" && prev.url) return prev;
+    } catch {
+      /* пропускаем недоступный день */
+    }
+  }
+  throw new Error("no recent apod image (video days?)");
+}
+
 async function getApod(): Promise<{ bytes: Uint8Array; type: string }> {
   // Сдвиг ~5ч: NASA публикует новый APOD в полночь US Eastern (~04-05:00 UTC),
   // а не в 00:00 UTC. Считаем «сутки» от 05:00 UTC — так кеш флипается уже после
@@ -35,14 +59,9 @@ async function getApod(): Promise<{ bytes: Uint8Array; type: string }> {
   if (cache && cache.day === day) return cache;
 
   // UA обязателен (иначе шлюз 403). Реальный NASA_API_KEY снимает блок DEMO_KEY
-  // с дата-центровых IP. Таймауты щедрые: тянем раз в сутки, VPS-канал общий.
+  // с дата-центровых IP. В видео-дни findImageMeta вернёт последнюю картинку.
   const key = process.env.NASA_API_KEY || "DEMO_KEY";
-  const metaRes = await stage("meta", 15000, `https://api.nasa.gov/planetary/apod?api_key=${key}`, {
-    ...UA,
-    Accept: "application/json",
-  });
-  const meta = await metaRes.json();
-  if (meta.media_type !== "image" || !meta.url) throw new Error("apod not an image today");
+  const meta = await findImageMeta(key);
 
   // Берём hi-res (hdurl), но с подстраховкой: если он падает по таймауту ИЛИ
   // слишком тяжёлый (панорамы бывают по 30+ МБ) — откатываемся на обычную url,
