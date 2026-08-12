@@ -28,7 +28,10 @@ async function stage(label: string, ms: number, url: string, headers: Record<str
 }
 
 async function getApod(): Promise<{ bytes: Uint8Array; type: string }> {
-  const day = Math.floor(Date.now() / 86_400_000);
+  // Сдвиг ~5ч: NASA публикует новый APOD в полночь US Eastern (~04-05:00 UTC),
+  // а не в 00:00 UTC. Считаем «сутки» от 05:00 UTC — так кеш флипается уже после
+  // публикации, без окна «вчерашней» картинки.
+  const day = Math.floor((Date.now() - 5 * 3_600_000) / 86_400_000);
   if (cache && cache.day === day) return cache;
 
   // UA обязателен (иначе шлюз 403). Реальный NASA_API_KEY снимает блок DEMO_KEY

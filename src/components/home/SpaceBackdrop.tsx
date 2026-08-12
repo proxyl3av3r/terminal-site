@@ -152,6 +152,11 @@ export default function SpaceBackdrop() {
     };
   }, []);
 
+  // Cache-buster по «NASA-дате» (сдвиг −5ч, как на сервере): каждый новый день —
+  // новый URL, чтобы браузер и Cloudflare тянули свежий снимок, а не держали
+  // вчерашний сутки под одним адресом.
+  const dayKey = new Date(Date.now() - 5 * 3_600_000).toISOString().slice(0, 10);
+
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 z-[1] overflow-hidden">
       {/* 1) базовый космос с параллаксом */}
@@ -159,7 +164,7 @@ export default function SpaceBackdrop() {
         ref={imgRef}
         className="absolute inset-0"
         style={{
-          backgroundImage: "url(/api/apod)",
+          backgroundImage: `url(/api/apod?d=${dayKey})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
           filter: "grayscale(0.15) brightness(0.9) contrast(1.05)",
