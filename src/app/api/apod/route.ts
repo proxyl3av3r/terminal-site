@@ -81,6 +81,8 @@ export async function GET() {
     });
   } catch (err) {
     console.error("apod failed:", errText(err));
-    return new Response(null, { status: 204 });
+    // no-store: разовый сбой НЕ должен залипать в кеше браузера/Cloudflare под
+    // сегодняшним URL — иначе фон пропадёт на весь день.
+    return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
   }
 }
