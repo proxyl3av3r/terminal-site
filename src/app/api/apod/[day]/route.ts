@@ -3,16 +3,17 @@ import { errText } from "@/lib/log";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Astronomy Picture of the Day (NASA) для фонового слоя главной. Кешируем на
-// СУТКИ в памяти процесса: к NASA ходим раз в день, всем отдаём байты сами
-// (браузер грузит с нашего домена → CSP img-src не трогаем). В видео-дни или
-// при сбое отдаём 204 — фон просто не появляется.
+// Astronomy Picture of the Day (NASA) для фонового слоя главной.
+// Дата в ПУТИ (/api/apod/2026-08-15) — чисто cache-buster: Cloudflare всегда
+// учитывает путь в ключе кеша (query string — не всегда), поэтому каждый день
+// это гарантированно новый ресурс и фон обновляется. Значение day для логики НЕ
+// используется — «сегодня» сервер считает сам. Кешируем байты на сутки в памяти
+// процесса (к NASA ходим раз в день). В видео-дни берём последнюю картинку.
 
 let cache: { day: number; bytes: Uint8Array; type: string } | null = null;
 
 const UA = { "User-Agent": "bash-app.com (+https://bash-app.com)" };
 
-// Запрос с таймаутом и меткой стадии (видно в логах, что именно тормозит).
 async function stage(label: string, ms: number, url: string, headers: Record<string, string>): Promise<Response> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
@@ -27,15 +28,13 @@ async function stage(label: string, ms: number, url: string, headers: Record<str
   }
 }
 
-// Метаданные APOD за конкретную дату (или сегодня, если date не задан).
 async function fetchMeta(key: string, date?: string): Promise<any> {
   const url = `https://api.nasa.gov/planetary/apod?api_key=${key}${date ? `&date=${date}` : ""}`;
   const res = await stage("meta", 15000, url, { ...UA, Accept: "application/json" });
   return res.json();
 }
 
-// Ищем ДЕНЬ С КАРТИНКОЙ: сегодня, а если видео-день (media_type=video) — шагаем
-// назад до 6 дней к последнему снимку. Так фон есть всегда, даже когда у NASA видео.
+// Ищем день с картинкой: сегодня, а если видео-день — шагаем назад до 6 дней.
 async function findImageMeta(key: string): Promise<any> {
   const today = await fetchMeta(key);
   if (today.media_type === "image" && today.url) return today;
@@ -52,20 +51,13 @@ async function findImageMeta(key: string): Promise<any> {
 }
 
 async function getApod(): Promise<{ bytes: Uint8Array; type: string }> {
-  // Сдвиг ~5ч: NASA публикует новый APOD в полночь US Eastern (~04-05:00 UTC),
-  // а не в 00:00 UTC. Считаем «сутки» от 05:00 UTC — так кеш флипается уже после
-  // публикации, без окна «вчерашней» картинки.
+  // Граница суток со сдвигом ~5ч (NASA публикует в полночь US Eastern).
   const day = Math.floor((Date.now() - 5 * 3_600_000) / 86_400_000);
   if (cache && cache.day === day) return cache;
 
-  // UA обязателен (иначе шлюз 403). Реальный NASA_API_KEY снимает блок DEMO_KEY
-  // с дата-центровых IP. В видео-дни findImageMeta вернёт последнюю картинку.
   const key = process.env.NASA_API_KEY || "DEMO_KEY";
   const meta = await findImageMeta(key);
 
-  // Берём hi-res (hdurl), но с подстраховкой: если он падает по таймауту ИЛИ
-  // слишком тяжёлый (панорамы бывают по 30+ МБ) — откатываемся на обычную url,
-  // чтобы фон не пропадал. Хост apod.nasa.gov отдельный и иногда медленный.
   const hd: string | undefined = meta.hdurl;
   const std: string = meta.url;
 
@@ -80,7 +72,7 @@ async function getApod(): Promise<{ bytes: Uint8Array; type: string }> {
   try {
     imgRes = hd ? await grab(hd, "image-hd") : await grab(std, "image-std");
   } catch {
-    imgRes = await grab(std, "image-std"); // фолбэк на стандартное разрешение
+    imgRes = await grab(std, "image-std");
   }
 
   const bytes = new Uint8Array(await imgRes.arrayBuffer());
@@ -94,14 +86,12 @@ export async function GET() {
     return new Response(a.bytes, {
       headers: {
         "Content-Type": a.type,
-        // сутки в CDN/браузере — картинка одна на весь день
+        // URL меняется каждый день → можно кешировать сутки.
         "Cache-Control": "public, max-age=21600, s-maxage=86400",
       },
     });
   } catch (err) {
     console.error("apod failed:", errText(err));
-    // no-store: разовый сбой НЕ должен залипать в кеше браузера/Cloudflare под
-    // сегодняшним URL — иначе фон пропадёт на весь день.
     return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
   }
 }
