@@ -4,13 +4,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Astronomy Picture of the Day (NASA) для фонового слоя главной.
-// Дата в ПУТИ (/api/apod/2026-08-15) — чисто cache-buster: Cloudflare всегда
-// учитывает путь в ключе кеша (query string — не всегда), поэтому каждый день
-// это гарантированно новый ресурс и фон обновляется. Значение day для логики НЕ
-// используется — «сегодня» сервер считает сам. Кешируем байты на сутки в памяти
-// процесса (к NASA ходим раз в день). В видео-дни берём последнюю картинку.
+// Дата в ПУТИ (/api/apod/2026-08-15) — cache-buster: Cloudflare всегда учитывает
+// путь в ключе кеша (query — не всегда). Значение для логики НЕ используется.
+// Кешируем байты на сутки в памяти процесса; при сбое NASA отдаём вчерашний
+// кадр (лучше, чем пустой фон). В видео-дни берём последнюю картинку.
 
 let cache: { day: number; bytes: Uint8Array; type: string } | null = null;
+let lastFail = 0;
 
 const UA = { "User-Agent": "bash-app.com (+https://bash-app.com)" };
 
@@ -18,9 +18,7 @@ async function stage(label: string, ms: number, url: string, headers: Record<str
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
   try {
-    // cache: "no-store" — критично: иначе Next.js Data Cache запоминает ответ
-    // NASA и при суточном перезапросе отдаёт вчерашний → картинка не меняется
-    // до пересборки (деплоя). Тянем сами (in-memory cache на сутки) — Next кеш не нужен.
+    // cache: "no-store" — иначе Next.js Data Cache отдаёт вчерашний ответ NASA.
     const res = await fetch(url, { signal: ctrl.signal, headers, cache: "no-store" });
     if (!res.ok) throw new Error(`${res.status}`);
     return res;
@@ -31,10 +29,18 @@ async function stage(label: string, ms: number, url: string, headers: Record<str
   }
 }
 
+// Метаданные APOD за дату (или сегодня). api.nasa.gov бывает медленным с VPS —
+// таймаут 20с и один ретрай.
 async function fetchMeta(key: string, date?: string): Promise<any> {
   const url = `https://api.nasa.gov/planetary/apod?api_key=${key}${date ? `&date=${date}` : ""}`;
-  const res = await stage("meta", 15000, url, { ...UA, Accept: "application/json" });
-  return res.json();
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const res = await stage("meta", 20000, url, { ...UA, Accept: "application/json" });
+      return await res.json();
+    } catch (e) {
+      if (attempt >= 2) throw e;
+    }
+  }
 }
 
 // Ищем день с картинкой: сегодня, а если видео-день — шагаем назад до 6 дней.
@@ -53,11 +59,7 @@ async function findImageMeta(key: string): Promise<any> {
   throw new Error("no recent apod image (video days?)");
 }
 
-async function getApod(): Promise<{ bytes: Uint8Array; type: string }> {
-  // Граница суток со сдвигом ~5ч (NASA публикует в полночь US Eastern).
-  const day = Math.floor((Date.now() - 5 * 3_600_000) / 86_400_000);
-  if (cache && cache.day === day) return cache;
-
+async function fetchFresh(day: number): Promise<{ bytes: Uint8Array; type: string }> {
   const key = process.env.NASA_API_KEY || "DEMO_KEY";
   const meta = await findImageMeta(key);
 
@@ -83,14 +85,36 @@ async function getApod(): Promise<{ bytes: Uint8Array; type: string }> {
   return cache;
 }
 
+async function getApod(): Promise<{ bytes: Uint8Array; type: string; stale: boolean }> {
+  // Граница суток со сдвигом ~5ч (NASA публикует в полночь US Eastern).
+  const day = Math.floor((Date.now() - 5 * 3_600_000) / 86_400_000);
+  if (cache && cache.day === day) return { ...cache, stale: false };
+
+  // Во время сбоя NASA не долбим его каждым запросом: недавно не вышло + есть
+  // старый кадр → отдаём вчерашний.
+  if (cache && Date.now() - lastFail < 300_000) return { ...cache, stale: true };
+
+  try {
+    const fresh = await fetchFresh(day);
+    return { ...fresh, stale: false };
+  } catch (e) {
+    lastFail = Date.now();
+    if (cache) return { ...cache, stale: true }; // вчерашний вместо пустоты
+    throw e;
+  }
+}
+
 export async function GET() {
   try {
     const a = await getApod();
     return new Response(a.bytes, {
       headers: {
         "Content-Type": a.type,
-        // URL меняется каждый день → можно кешировать сутки.
-        "Cache-Control": "public, max-age=21600, s-maxage=86400",
+        // Свежий кадр кешируем на сутки; «вчерашний» (stale) — лишь на 5 мин,
+        // чтобы кеши быстро подхватили свежий, когда NASA очнётся.
+        "Cache-Control": a.stale
+          ? "public, max-age=300"
+          : "public, max-age=21600, s-maxage=86400",
       },
     });
   } catch (err) {
