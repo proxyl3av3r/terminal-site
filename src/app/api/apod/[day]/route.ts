@@ -18,7 +18,10 @@ async function stage(label: string, ms: number, url: string, headers: Record<str
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), ms);
   try {
-    const res = await fetch(url, { signal: ctrl.signal, headers });
+    // cache: "no-store" — критично: иначе Next.js Data Cache запоминает ответ
+    // NASA и при суточном перезапросе отдаёт вчерашний → картинка не меняется
+    // до пересборки (деплоя). Тянем сами (in-memory cache на сутки) — Next кеш не нужен.
+    const res = await fetch(url, { signal: ctrl.signal, headers, cache: "no-store" });
     if (!res.ok) throw new Error(`${res.status}`);
     return res;
   } catch (e) {
