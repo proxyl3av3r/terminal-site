@@ -28,6 +28,28 @@ const nextConfig = {
       "upgrade-insecure-requests",
     ].join("; ");
 
+    // /throw — жест-бросок: нужна камера (MediaPipe HandLandmarker) и WASM,
+    // модель и wasm-раннер самохостятся в /public/mediapipe (без внешних
+    // хостов, CSP остаётся строгим). Переопределяем только два ключа —
+    // остальные заголовки ниже (HSTS, X-Frame-Options и т.д.) достаются
+    // этому пути от общего блока, т.к. Next при совпадении неск. блоков
+    // на одном пути применяет все, а при совпадении ключа — берёт последний.
+    const throwCsp = [
+      "default-src 'self'",
+      `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isProd ? "" : " 'unsafe-eval'"}`,
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data:",
+      "connect-src 'self'",
+      "media-src 'self' blob:",
+      "worker-src 'self' blob:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+      "upgrade-insecure-requests",
+    ].join("; ");
+
     // Базовые заголовки безопасности на все маршруты.
     return [
       {
@@ -44,6 +66,13 @@ const nextConfig = {
             key: "Strict-Transport-Security",
             value: "max-age=63072000; includeSubDomains; preload",
           },
+        ],
+      },
+      {
+        source: "/throw/:path*",
+        headers: [
+          { key: "Content-Security-Policy", value: throwCsp },
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
         ],
       },
     ];

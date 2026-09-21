@@ -34,3 +34,18 @@ export function getGameSocket(): Socket {
   }
   return gameSocket;
 }
+
+// Сокет namespace «/throw» (жест-бросок). Анонимный — без cookie/сессии,
+// комнаты только в памяти realtime-сервиса. Отдельный сокет на вкладку,
+// чтобы не плодить его при каждом ре-рендере компонента.
+let throwSocket: Socket | null = null;
+
+export function getThrowSocket(): Socket {
+  if (!throwSocket) {
+    throwSocket = io("/throw", {
+      path: "/socket.io",
+      reconnectionDelayMax: 8000,
+    });
+  }
+  return throwSocket;
+}
